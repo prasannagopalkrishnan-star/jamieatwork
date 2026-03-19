@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jamie@Work — Design System Preview</title>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F8F7F4;
+    --bg-wash: #F5F3EE;
+    --bg-rose: #FFF1F2;
+    --card: #FFFFFF;
+    --border: #E8E5DF;
+    --border-subtle: #F0EDE8;
+
+    --text-primary: #1A1A1A;
+    --text-medium: #57534E;
+    --text-secondary: #6B6B6B;
+    --text-tertiary: #A3A3A3;
+
+    --purple: #7C3AED;
+    --purple-light: #F3F0FF;
+    --purple-border: #E9E5FF;
+    --purple-muted: #C4B5FD;
+
+    --rose: #F43F5E;
+    --rose-light: #FFF1F2;
+    --rose-100: #FFE4E6;
+    --rose-border: #FECDD3;
+    --rose-muted: #FDA4AF;
+
+    --pink: #EC4899;
+
+    --success: #16A34A;
+    --warning: #EA580C;
+    --error: #DC2626;
+    --info: #0EA5E9;
+
+    --font-display: 'Cabinet Grotesk', -apple-system, sans-serif;
+    --font-body: 'DM Sans', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 100px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-weight: 500;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+  }
+
+  .container { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── HEADER ── */
+  .preview-header {
+    padding: 48px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .preview-header h1 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 32px;
+    letter-spacing: -0.04em;
+    margin-bottom: 6px;
+  }
+  .preview-header p {
+    color: var(--text-secondary);
+    font-size: 15px;
+  }
+
+  /* ── SECTION TITLES ── */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 24px;
+    letter-spacing: -0.04em;
+    margin-bottom: 24px;
+  }
+  .section { margin-bottom: 64px; }
+
+  /* ── FONT SPECIMENS ── */
+  .specimen-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    margin-bottom: 16px;
+  }
+  .specimen-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .specimen-meta .role {
+    background: var(--purple-light);
+    color: var(--purple);
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+    border: 1px solid var(--purple-border);
+  }
+  .specimen-display {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 56px;
+    letter-spacing: -0.05em;
+    line-height: 1.05;
+    margin-bottom: 8px;
+  }
+  .specimen-body {
+    font-family: var(--font-body);
+    font-size: 17px;
+    color: var(--text-medium);
+    line-height: 1.7;
+    font-weight: 500;
+    max-width: 640px;
+  }
+  .specimen-mono {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-medium);
+    line-height: 1.8;
+  }
+
+  /* ── COLOR PALETTE ── */
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .swatch {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .swatch-color {
+    height: 72px;
+    width: 100%;
+  }
+  .swatch-info {
+    padding: 10px 12px;
+  }
+  .swatch-name {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+  .swatch-hex {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  /* ── COMPONENTS ── */
+  .component-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .btn {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 15px;
+    padding: 12px 28px;
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--purple);
+    color: white;
+    box-shadow: 0 4px 16px rgba(124,58,237,.25);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,58,237,.3); }
+  .btn-rose {
+    background: var(--rose);
+    color: white;
+    box-shadow: 0 4px 16px rgba(244,63,94,.2);
+  }
+  .btn-rose:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(244,63,94,.3); }
+  .btn-gradient {
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    color: white;
+    box-shadow: 0 4px 16px rgba(124,58,237,.2);
+  }
+  .btn-ghost {
+    background: var(--card);
+    color: var(--text-primary);
+    border: 1.5px solid var(--border);
+    font-weight: 600;
+  }
+  .btn-ghost:hover { border-color: var(--purple); color: var(--purple); }
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge-purple { background: var(--purple-light); color: var(--purple); border: 1px solid var(--purple-border); }
+  .badge-rose { background: var(--rose-light); color: var(--rose); border: 1px solid var(--rose-border); }
+  .badge-success { background: #F0FDF4; color: var(--success); border: 1px solid #BBF7D0; }
+  .badge-warning { background: #FFF7ED; color: var(--warning); border: 1px solid #FED7AA; }
+
+  /* ── ALERT COMPONENTS ── */
+  .alert {
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    border: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .alert-success { background: #F0FDF4; border-color: #BBF7D0; color: #15803D; }
+  .alert-warning { background: #FFF7ED; border-color: #FED7AA; color: #C2410C; }
+  .alert-error { background: #FEF2F2; border-color: #FECACA; color: #B91C1C; }
+  .alert-info { background: #F0F9FF; border-color: #BAE6FD; color: #0369A1; }
+
+  /* ── INPUT ── */
+  .input-demo {
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 500;
+    background: var(--card);
+    color: var(--text-primary);
+    width: 320px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-demo:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(124,58,237,.08); }
+  .input-demo::placeholder { color: var(--text-tertiary); }
+
+  /* ── MOCKUP: HERO ── */
+  .mockup-hero {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 64px 40px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .mockup-hero::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    right: 5%;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(139,92,246,.07) 0%, transparent 70%);
+    filter: blur(40px);
+  }
+  .mockup-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -10%;
+    left: 10%;
+    width: 250px;
+    height: 250px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(244,63,94,.05) 0%, transparent 70%);
+    filter: blur(40px);
+  }
+  .mockup-hero > * { position: relative; z-index: 1; }
+
+  /* ── MOCKUP: CAPABILITY CARD ── */
+  .cap-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 700px) { .cap-grid { grid-template-columns: 1fr; } }
+  .cap-card {
+    padding: 24px;
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 1px 3px rgba(0,0,0,.03);
+    transition: transform 0.25s cubic-bezier(.22,1,.36,1), box-shadow 0.25s;
+  }
+  .cap-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(124,58,237,.08), 0 2px 6px rgba(0,0,0,.04);
+  }
+  .cap-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 14px;
+  }
+  .cap-icon-purple { background: linear-gradient(135deg, #F3F0FF, #EDE9FE); border: 1px solid #E9E5FF; }
+  .cap-icon-rose { background: linear-gradient(135deg, #FFF1F2, #FFE4E6); border: 1px solid #FECDD3; }
+
+  /* ── MOCKUP: STEP CARD ── */
+  .step-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 700px) { .step-grid { grid-template-columns: 1fr; } }
+  .step-card {
+    padding: 32px 28px;
+    border-radius: var(--radius-xl);
+    background: var(--card);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 2px 8px rgba(0,0,0,.03);
+    position: relative;
+    overflow: hidden;
+  }
+  .step-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .step-num {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 48px;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #E9E5FF, #DDD6FE);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* ── MOCKUP: ROSE SECTION BG ── */
+  .rose-section {
+    background: var(--rose-light);
+    border: 1px solid var(--rose-border);
+    border-radius: var(--radius-xl);
+    padding: 48px 40px;
+    margin-bottom: 24px;
+  }
+
+  /* ── COMPARISON: BEFORE / AFTER ── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 700px) { .compare-grid { grid-template-columns: 1fr; } }
+  .compare-card {
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    border: 1px solid var(--border);
+  }
+  .compare-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ── HEADER ── -->
+  <div class="preview-header">
+    <h1>jamie<span style="color: var(--rose-muted); font-weight: 500;">@</span>work Design System</h1>
+    <p>Font + color + component preview. Proposed redesign for the landing page.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 1: TYPOGRAPHY SPECIMENS
+       ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label" style="color: var(--purple);">TYPOGRAPHY</div>
+    <div class="section-title">Font Specimens</div>
+
+    <!-- Display: Cabinet Grotesk -->
+    <div class="specimen-card">
+      <div class="specimen-meta">
+        <span>Cabinet Grotesk / 900 / -0.05em</span>
+        <span class="role">DISPLAY</span>
+      </div>
+      <div class="specimen-display">
+        Your SDR.<br>
+        <span style="background: linear-gradient(135deg, var(--purple), var(--pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Trained in 10 minutes.</span>
+      </div>
+    </div>
+
+    <!-- Body: DM Sans -->
+    <div class="specimen-card">
+      <div class="specimen-meta">
+        <span>DM Sans / 500 / normal</span>
+        <span class="role">BODY</span>
+      </div>
+      <div class="specimen-body">
+        Jamie learns your product, pitch, and ICP &mdash; then qualifies leads, sends outreach, and books meetings on your calendar. Around the clock. No ramp time, no salary, no coffee budget.
+      </div>
+      <div style="margin-top: 16px;">
+        <div class="specimen-body" style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">DM Sans 600 &mdash; Subheadings & labels</div>
+        <div class="specimen-body" style="font-weight: 700; font-size: 15px;">DM Sans 700 &mdash; Buttons & emphasis</div>
+      </div>
+    </div>
+
+    <!-- Mono: JetBrains Mono -->
+    <div class="specimen-card">
+      <div class="specimen-meta">
+        <span>JetBrains Mono / 500 / 0.1em</span>
+        <span class="role">MONO / LABELS</span>
+      </div>
+      <div class="specimen-mono">
+        CAPABILITIES &nbsp;&bull;&nbsp; 3 STEPS &nbsp;&bull;&nbsp; ~2 MIN &nbsp;&bull;&nbsp; $0/mo to start<br>
+        status: active &nbsp;&bull;&nbsp; leads_qualified: 47 &nbsp;&bull;&nbsp; meetings_booked: 12
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 2: COLOR PALETTE
+       ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label" style="color: var(--rose);">COLORS</div>
+    <div class="section-title">Palette</div>
+
+    <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; max-width: 560px;">Purple as primary brand. Rose as co-equal accent for warmth and personality. Cream background to differentiate from dark-mode AI competitors.</p>
+
+    <!-- Primary + Accent -->
+    <div style="margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.08em;">BRAND</div>
+    <div class="palette-grid">
+      <div class="swatch"><div class="swatch-color" style="background: #7C3AED;"></div><div class="swatch-info"><div class="swatch-name">Purple</div><div class="swatch-hex">#7C3AED</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #F3F0FF;"></div><div class="swatch-info"><div class="swatch-name">Purple Light</div><div class="swatch-hex">#F3F0FF</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #C4B5FD;"></div><div class="swatch-info"><div class="swatch-name">Purple Muted</div><div class="swatch-hex">#C4B5FD</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #F43F5E;"></div><div class="swatch-info"><div class="swatch-name">Rose</div><div class="swatch-hex">#F43F5E</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #FFF1F2;"></div><div class="swatch-info"><div class="swatch-name">Rose Light</div><div class="swatch-hex">#FFF1F2</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #FFE4E6;"></div><div class="swatch-info"><div class="swatch-name">Rose 100</div><div class="swatch-hex">#FFE4E6</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #EC4899;"></div><div class="swatch-info"><div class="swatch-name">Pink</div><div class="swatch-hex">#EC4899</div></div></div>
+    </div>
+
+    <!-- Surfaces -->
+    <div style="margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.08em;">SURFACES</div>
+    <div class="palette-grid">
+      <div class="swatch"><div class="swatch-color" style="background: #F8F7F4;"></div><div class="swatch-info"><div class="swatch-name">Background</div><div class="swatch-hex">#F8F7F4</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #F5F3EE;"></div><div class="swatch-info"><div class="swatch-name">Bg Wash</div><div class="swatch-hex">#F5F3EE</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #FFFFFF; border: 1px solid #E8E5DF;"></div><div class="swatch-info"><div class="swatch-name">Card</div><div class="swatch-hex">#FFFFFF</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #FFF1F2;"></div><div class="swatch-info"><div class="swatch-name">Rose Wash</div><div class="swatch-hex">#FFF1F2</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #E8E5DF;"></div><div class="swatch-info"><div class="swatch-name">Border</div><div class="swatch-hex">#E8E5DF</div></div></div>
+    </div>
+
+    <!-- Text -->
+    <div style="margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.08em;">TEXT</div>
+    <div class="palette-grid">
+      <div class="swatch"><div class="swatch-color" style="background: #1A1A1A;"></div><div class="swatch-info"><div class="swatch-name">Primary</div><div class="swatch-hex">#1A1A1A</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #57534E;"></div><div class="swatch-info"><div class="swatch-name">Medium</div><div class="swatch-hex">#57534E</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #6B6B6B;"></div><div class="swatch-info"><div class="swatch-name">Secondary</div><div class="swatch-hex">#6B6B6B</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #A3A3A3;"></div><div class="swatch-info"><div class="swatch-name">Tertiary</div><div class="swatch-hex">#A3A3A3</div></div></div>
+    </div>
+
+    <!-- Semantic -->
+    <div style="margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.08em;">SEMANTIC</div>
+    <div class="palette-grid">
+      <div class="swatch"><div class="swatch-color" style="background: #16A34A;"></div><div class="swatch-info"><div class="swatch-name">Success</div><div class="swatch-hex">#16A34A</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #EA580C;"></div><div class="swatch-info"><div class="swatch-name">Warning</div><div class="swatch-hex">#EA580C</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #DC2626;"></div><div class="swatch-info"><div class="swatch-name">Error</div><div class="swatch-hex">#DC2626</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: #0EA5E9;"></div><div class="swatch-info"><div class="swatch-name">Info</div><div class="swatch-hex">#0EA5E9</div></div></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 3: UI COMPONENTS
+       ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label" style="color: var(--purple);">COMPONENTS</div>
+    <div class="section-title">Buttons, Badges, Inputs, Alerts</div>
+
+    <!-- Buttons -->
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; font-weight: 600; letter-spacing: 0.08em;">BUTTONS</p>
+    <div class="component-row">
+      <button class="btn btn-primary">Hire Jamie</button>
+      <button class="btn btn-rose">Get Started</button>
+      <button class="btn btn-gradient">Upgrade Plan</button>
+      <button class="btn btn-ghost">How It Works</button>
+    </div>
+
+    <!-- Badges -->
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; font-weight: 600; letter-spacing: 0.08em;">BADGES</p>
+    <div class="component-row">
+      <span class="badge badge-purple"><span style="width:6px;height:6px;border-radius:50%;background:var(--purple);"></span> AI SDR Active</span>
+      <span class="badge badge-rose"><span style="width:6px;height:6px;border-radius:50%;background:var(--rose);"></span> New Feature</span>
+      <span class="badge badge-success"><span style="width:6px;height:6px;border-radius:50%;background:var(--success);"></span> Meeting Booked</span>
+      <span class="badge badge-warning"><span style="width:6px;height:6px;border-radius:50%;background:var(--warning);"></span> Needs Review</span>
+    </div>
+
+    <!-- Inputs -->
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; margin-top: 8px; font-weight: 600; letter-spacing: 0.08em;">INPUTS</p>
+    <div class="component-row">
+      <input class="input-demo" type="text" placeholder="yourcompany.com">
+      <input class="input-demo" type="text" value="jamie@work.ai" style="border-color: var(--purple); box-shadow: 0 0 0 3px rgba(124,58,237,.08);">
+    </div>
+
+    <!-- Alerts -->
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; margin-top: 8px; font-weight: 600; letter-spacing: 0.08em;">ALERTS</p>
+    <div class="alert alert-success">Meeting booked with Sarah Chen (Acme Corp) for Thursday 2pm.</div>
+    <div class="alert alert-warning">Jamie needs more context about your enterprise pricing tier.</div>
+    <div class="alert alert-error">Calendar integration disconnected. Reconnect to resume booking.</div>
+    <div class="alert alert-info">Jamie has qualified 12 new leads this week.</div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 4: REALISTIC PAGE MOCKUPS
+       ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label" style="color: var(--rose);">MOCKUPS</div>
+    <div class="section-title">Landing Page Sections (Proposed)</div>
+
+    <!-- Mockup: Hero -->
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; font-weight: 600; letter-spacing: 0.08em;">FOLD 1 &mdash; HERO</p>
+    <div class="mockup-hero">
+      <div class="badge badge-purple" style="margin-bottom: 24px;">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--purple);"></span>
+        Your AI Sales Development Rep
+      </div>
+      <h2 style="font-family: var(--font-display); font-weight: 900; font-size: clamp(36px, 5vw, 56px); letter-spacing: -0.05em; line-height: 1.05; margin-bottom: 16px;">
+        Your SDR.<br>
+        <span style="background: linear-gradient(135deg, var(--purple), var(--pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Trained in 10 minutes.</span>
+      </h2>
+      <p style="font-size: 17px; color: var(--text-secondary); max-width: 480px; margin: 0 auto 28px; font-weight: 500; line-height: 1.6;">
+        Jamie learns your product, pitch, and ICP &mdash; then qualifies leads, sends outreach, and books meetings on your calendar.
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <button class="btn btn-primary" style="font-size: 16px; padding: 14px 32px; border-radius: 14px;">Hire Jamie &mdash; Free to Start &rarr;</button>
+        <button class="btn btn-ghost" style="font-size: 16px; padding: 14px 24px; border-radius: 14px;">How It Works</button>
+      </div>
+    </div>
+
+    <!-- Mockup: Capabilities on rose wash -->
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; font-weight: 600; letter-spacing: 0.08em;">FOLD 2 &mdash; CAPABILITIES (rose wash background)</p>
+    <div class="rose-section">
+      <div style="text-align: center; margin-bottom: 32px;">
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--rose); font-weight: 600; letter-spacing: 0.1em; margin-bottom: 8px;">CAPABILITIES</div>
+        <h3 style="font-family: var(--font-display); font-weight: 900; font-size: 32px; letter-spacing: -0.04em;">What Jamie Does</h3>
+        <p style="font-size: 15px; color: var(--text-secondary); font-weight: 500; margin-top: 6px;">A full SDR skill set, trained on your specific product.</p>
+      </div>
+      <div class="cap-grid">
+        <div class="cap-card">
+          <div class="cap-icon cap-icon-purple">&#127919;</div>
+          <h4 style="font-family: var(--font-display); font-weight: 800; font-size: 16px; letter-spacing: -0.02em; margin-bottom: 6px;">Inbound Chat</h4>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55; font-weight: 500;">Engages visitors the moment they land, qualifies them, and books meetings.</p>
+        </div>
+        <div class="cap-card">
+          <div class="cap-icon cap-icon-rose">&#9993;&#65039;</div>
+          <h4 style="font-family: var(--font-display); font-weight: 800; font-size: 16px; letter-spacing: -0.02em; margin-bottom: 6px;">Outbound Email</h4>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55; font-weight: 500;">Personalized cold outreach based on your ICP. Zero generic templates.</p>
+        </div>
+        <div class="cap-card">
+          <div class="cap-icon cap-icon-purple">&#128270;</div>
+          <h4 style="font-family: var(--font-display); font-weight: 800; font-size: 16px; letter-spacing: -0.02em; margin-bottom: 6px;">Lead Qualification</h4>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55; font-weight: 500;">Scores every lead against your framework. Bad fits get filtered out.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mockup: Steps -->
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; font-weight: 600; letter-spacing: 0.08em;">FOLD 3 &mdash; HOW IT WORKS</p>
+    <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 48px 32px; margin-bottom: 24px;">
+      <div style="text-align: center; margin-bottom: 36px;">
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--rose); font-weight: 600; letter-spacing: 0.1em; margin-bottom: 8px;">3 STEPS</div>
+        <h3 style="font-family: var(--font-display); font-weight: 900; font-size: 32px; letter-spacing: -0.04em;">
+          Ready in <span style="background: linear-gradient(135deg, var(--purple), var(--pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">10 minutes</span>
+        </h3>
+      </div>
+      <div class="step-grid">
+        <div class="step-card">
+          <div class="step-bar" style="background: var(--purple);"></div>
+          <div class="step-num">1</div>
+          <h4 style="font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.02em; margin-bottom: 8px;">Drop your website</h4>
+          <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; font-weight: 500; margin-bottom: 16px;">Jamie scans your site and pre-fills product, ICP, and differentiators.</p>
+          <span class="badge badge-purple">~2 min</span>
+        </div>
+        <div class="step-card">
+          <div class="step-bar" style="background: var(--rose);"></div>
+          <div class="step-num">2</div>
+          <h4 style="font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.02em; margin-bottom: 8px;">Pick her personality</h4>
+          <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; font-weight: 500; margin-bottom: 16px;">Choose tone, CTA, and target market with visual cards. No forms.</p>
+          <span class="badge badge-rose">~3 min</span>
+        </div>
+        <div class="step-card">
+          <div class="step-bar" style="background: var(--purple);"></div>
+          <div class="step-num">3</div>
+          <h4 style="font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.02em; margin-bottom: 8px;">Answer 3 questions</h4>
+          <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; font-weight: 500; margin-bottom: 16px;">Objections, qualification, special context. That's it.</p>
+          <span class="badge badge-purple">~5 min</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before / After comparison -->
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; font-weight: 600; letter-spacing: 0.08em;">BEFORE / AFTER &mdash; KEY CHANGES</p>
+    <div class="compare-grid">
+      <div class="compare-card" style="background: #FAF9F7;">
+        <div class="compare-label" style="background: var(--bg-wash); color: var(--text-tertiary); border: 1px solid var(--border);">BEFORE</div>
+        <ul style="list-style: none; font-size: 14px; color: var(--text-secondary); line-height: 2.2;">
+          <li>General Sans (body) &mdash; soft, rounded</li>
+          <li>Pink only in gradient blend</li>
+          <li>Purple-only section markers</li>
+          <li>Uniform background across sections</li>
+          <li>No responsive grid collapse</li>
+        </ul>
+      </div>
+      <div class="compare-card" style="background: var(--rose-light);">
+        <div class="compare-label" style="background: var(--purple); color: white;">AFTER</div>
+        <ul style="list-style: none; font-size: 14px; color: var(--text-primary); line-height: 2.2; font-weight: 600;">
+          <li>DM Sans (body) &mdash; crisp, geometric</li>
+          <li>Rose #F43F5E as standalone accent</li>
+          <li>Alternating purple / rose markers</li>
+          <li>Rose wash (#FFF1F2) on alternating sections</li>
+          <li>Responsive breakpoints on all grids</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <footer style="padding: 32px 0; border-top: 1px solid var(--border); text-align: center;">
+    <p style="font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary);">jamie@work design system preview &bull; Generated by /design-consultation</p>
+  </footer>
+
+</div>
+
+</body>
+</html>

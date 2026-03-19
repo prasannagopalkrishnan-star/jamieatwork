@@ -236,17 +236,23 @@ npm run lint         # ESLint
 Use the /browse skill from gstack for all web browsing. Never use mcp__claude-in-chrome__* tools.
 
 Available skills:
-- /plan-ceo-review — Founder mode. Rethink the problem. Find the 10-star product.
-- /plan-eng-review — Lock architecture, data flow, edge cases before coding.
-- /plan-design-review — Review plans through a design lens.
-- /design-consultation — Research competitors, propose palette, generate mockups, write DESIGN.md.
-- /review — Paranoid staff engineer. Find bugs before they hit Vercel.
-- /ship — Sync main, run tests, push, open PR.
-- /qa — Full QA run with browser automation.
-- /qa-only — QA without code review.
-- /qa-design-review — QA that reads DESIGN.md choices.
-- /retro — Weekly metrics: commits, LOC, velocity, hotspots.
-- /document-release — Document what shipped.
-- /debug — Debug mode for hard problems.
+- /plan-ceo-review ï¿½ Founder mode. Rethink the problem. Find the 10-star product.
+- /plan-eng-review ï¿½ Lock architecture, data flow, edge cases before coding.
+- /plan-design-review ï¿½ Review plans through a design lens.
+- /design-consultation ï¿½ Research competitors, propose palette, generate mockups, write DESIGN.md.
+- /review ï¿½ Paranoid staff engineer. Find bugs before they hit Vercel.
+- /ship ï¿½ Sync main, run tests, push, open PR.
+- /qa ï¿½ Full QA run with browser automation.
+- /qa-only ï¿½ QA without code review.
+- /qa-design-review ï¿½ QA that reads DESIGN.md choices.
+- /retro ï¿½ Weekly metrics: commits, LOC, velocity, hotspots.
+- /document-release ï¿½ Document what shipped.
+- /debug ï¿½ Debug mode for hard problems.
 
 If gstack skills aren't working, run: cd .claude/skills/gstack && ./setup
+
+## Design System
+Always read DESIGN.md before making any visual or UI decisions.
+All font choices, colors, spacing, and aesthetic direction are defined there.
+Do not deviate without explicit user approval.
+In QA mode, flag any code that doesn't match DESIGN.md.
