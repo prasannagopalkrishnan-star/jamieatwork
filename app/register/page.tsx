@@ -1,11 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'register' | 'login'>('register')
+  return (
+    <Suspense>
+      <AuthPageInner />
+    </Suspense>
+  )
+}
+
+function AuthPageInner() {
+  const searchParams = useSearchParams()
+  const redirectPath = searchParams.get('redirect')
+  const [mode, setMode] = useState<'register' | 'login'>(redirectPath ? 'login' : 'register')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -46,7 +57,7 @@ export default function AuthPage() {
       return
     }
 
-    window.location.href = '/onboarding'
+    window.location.href = redirectPath || '/onboarding'
   }
 
   return (
@@ -74,7 +85,7 @@ export default function AuthPage() {
           {/* Logo */}
           <div className="r" style={{ textAlign: 'center', marginBottom: '32px' }}>
             <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px', textDecoration: 'none', color: '#1A1A1A' }}>
-              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'linear-gradient(135deg,#7C3AED,#EC4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '16px', fontWeight: 800 }}>J</div>
+              <div aria-hidden="true" style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'linear-gradient(135deg,#7C3AED,#EC4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '16px', fontWeight: 800, flexShrink: 0 }}>J</div>
               <span className="hd" style={{ fontSize: '19px', fontWeight: 800, letterSpacing: '-.03em' }}>
                 jamie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
               </span>
@@ -122,6 +133,14 @@ export default function AuthPage() {
                 ? 'Create your account — Jamie will be ready in under 10 minutes.'
                 : 'Log in to manage Jamie and your pipeline.'}
             </p>
+
+            {redirectPath && !error && (
+              <div className="bd" style={{
+                padding: '10px 14px', borderRadius: '10px', marginBottom: '20px',
+                background: '#F3F0FF', border: '1px solid #E9E5FF',
+                fontSize: '13px', color: '#7C3AED', fontWeight: 500,
+              }}>Sign in to continue</div>
+            )}
 
             {error && (
               <div className="bd" style={{

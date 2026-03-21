@@ -99,12 +99,13 @@ export default function Home() {
         }}>
           <div style={{ maxWidth: '1060px', margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none', color: '#1A1A1A' }}>
-              <div style={{
+              <div aria-hidden="true" style={{
                 width: '30px', height: '30px', borderRadius: '9px',
                 background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'white', fontSize: '14px', fontWeight: 800,
                 fontFamily: "'Cabinet Grotesk', sans-serif",
+                flexShrink: 0,
               }}>J</div>
               <span className="hd" style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-.03em' }}>
                 jamie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work

@@ -480,11 +480,12 @@ export default function DashboardPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none', color: '#1A1A1A' }}>
-            <div style={{
+            <div aria-hidden="true" style={{
               width: '28px', height: '28px', borderRadius: '8px',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'white', fontSize: '13px', fontWeight: 800,
+              flexShrink: 0,
             }}>J</div>
             <span style={{
               fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: '16px',

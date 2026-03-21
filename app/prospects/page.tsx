@@ -331,11 +331,12 @@ export default function ProspectsPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none', color: '#1A1A1A' }}>
-            <div style={{
+            <div aria-hidden="true" style={{
               width: '28px', height: '28px', borderRadius: '8px',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'white', fontSize: '13px', fontWeight: 800,
+              flexShrink: 0,
             }}>J</div>
             <span className="hd" style={{ fontSize: '16px', fontWeight: 900, letterSpacing: '-.03em' }}>
               jamie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work

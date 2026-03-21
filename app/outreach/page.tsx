@@ -493,7 +493,7 @@ export default function OutreachPage() {
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, padding: '14px 24px', background: 'rgba(248,247,244,.85)', backdropFilter: 'blur(16px)', borderBottom: `1px solid ${c.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none', color: c.textPrimary }}>
-            <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: c.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px', fontWeight: 800 }}>J</div>
+            <div aria-hidden="true" style={{ width: '28px', height: '28px', borderRadius: '8px', background: c.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px', fontWeight: 800, flexShrink: 0 }}>J</div>
             <span style={{ fontFamily: f.hd, fontSize: '16px', fontWeight: 900, letterSpacing: '-.03em' }}>jamie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work</span>
           </Link>
           <span style={{ fontFamily: f.mn, fontSize: '10px', color: c.textSecondary, padding: '3px 10px', borderRadius: '6px', border: '1px solid rgba(0,0,0,.08)', background: 'white', letterSpacing: '.06em', fontWeight: 600 }}>OUTREACH</span>
