@@ -28,23 +28,24 @@ export async function POST(request: NextRequest) {
       let icp = providedIcp || { industries: '', company_size: '', roles: '', geography: '' }
 
       if (user_id && (!providedIcp || !providedIcp.industries)) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('onboarding_data')
-          .eq('id', user_id)
-          .single()
+        try {
+          // Try auth user metadata (where onboarding saves data) — requires service role key
+          const { data: { user: authUser } } = await supabase.auth.admin.getUserById(user_id)
+          const od = authUser?.user_metadata?.onboarding_data as Record<string, unknown> | undefined
 
-        if (profile?.onboarding_data) {
-          const od = profile.onboarding_data as Record<string, unknown>
-          icp = {
-            industries: (od.target_industries as string[])?.join(', ') || icp.industries,
-            company_size: (od.target_company_size as string[])?.join(', ') || icp.company_size,
-            roles: (od.target_roles as string[])?.join(', ') || icp.roles,
-            geography: (od.target_geography as string[])?.join(', ') || icp.geography,
-            product_name: od.product_name || '',
-            product_description: od.product_description || '',
-            problem_solved: od.problem_solved || '',
+          if (od) {
+            icp = {
+              industries: (od.target_industries as string[])?.join(', ') || icp.industries,
+              company_size: (od.company_sizes as string[])?.join(', ') || icp.company_size,
+              roles: (od.target_titles as string[])?.join(', ') || icp.roles,
+              geography: (od.geographies as string[])?.join(', ') || icp.geography,
+              product_name: (od.product_name as string) || '',
+              product_description: (od.product_description as string) || '',
+              problem_solved: (od.problem_solved as string) || '',
+            }
           }
+        } catch {
+          // admin API not available (no service role key) — use ICP from request body
         }
       }
 

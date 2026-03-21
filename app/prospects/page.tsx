@@ -142,28 +142,27 @@ export default function ProspectsPage() {
     return () => observer.disconnect()
   }, [loadMore])
 
+  // Error state
+  const [error, setError] = useState<string | null>(null)
+
   // Generate new batch
   const generateProspects = async () => {
     setLoading(true)
+    setError(null)
 
     let icp = { industries: '', company_size: '', roles: '', geography: '', product_name: '', product_description: '', problem_solved: '' }
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user?.id) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('onboarding_data')
-          .eq('id', user.id)
-          .single()
-
-        if (profile?.onboarding_data) {
-          const od = profile.onboarding_data as Record<string, unknown>
+        // Onboarding data is stored in auth user_metadata, not user_profiles table
+        const od = user.user_metadata?.onboarding_data as Record<string, unknown> | undefined
+        if (od) {
           icp = {
             industries: ((od.target_industries as string[]) || []).join(', '),
-            company_size: ((od.target_company_size as string[]) || []).join(', '),
-            roles: ((od.target_roles as string[]) || []).join(', '),
-            geography: ((od.target_geography as string[]) || []).join(', '),
+            company_size: ((od.company_sizes as string[]) || []).join(', '),
+            roles: ((od.target_titles as string[]) || []).join(', '),
+            geography: ((od.geographies as string[]) || []).join(', '),
             product_name: (od.product_name as string) || '',
             product_description: (od.product_description as string) || '',
             problem_solved: (od.problem_solved as string) || '',
@@ -181,13 +180,24 @@ export default function ProspectsPage() {
         body: JSON.stringify({ action: 'generate', user_id: userId, icp }),
       })
       const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || `Generation failed (${res.status})`)
+        return
+      }
+      if (data.error) {
+        setError(data.error)
+        return
+      }
       if (data.prospects?.length > 0) {
         // Reload from DB to get proper IDs and status
         await loadProspects(userId, 0, true)
         await loadFilters(userId)
+      } else {
+        setError('No prospects were generated. Please try again.')
       }
     } catch (err) {
       console.error('Failed to generate prospects:', err)
+      setError('Network error — could not reach the server. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -450,6 +460,28 @@ export default function ProspectsPage() {
                 outline: 'none',
               }}
             />
+          </div>
+        )}
+
+        {/* Error banner */}
+        {error && (
+          <div style={{
+            padding: '14px 20px', marginBottom: '20px', borderRadius: '12px',
+            background: '#FEF2F2', border: '1px solid #FECACA',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <p className="bd" style={{ fontSize: '14px', color: '#DC2626', fontWeight: 600, margin: 0 }}>
+              {error}
+            </p>
+            <button
+              onClick={() => setError(null)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: '18px', color: '#DC2626', padding: '0 4px', lineHeight: 1,
+              }}
+            >
+              &times;
+            </button>
           </div>
         )}
 
