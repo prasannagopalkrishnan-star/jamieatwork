@@ -54,7 +54,7 @@ Guidelines:
 - For "not_interested": draft a graceful, non-pushy acknowledgment
 - For "need_more_info": draft a response addressing their specific questions
 - For "unsubscribe": draft a polite removal confirmation
-- For "out_of_office": note to retry later
+- For "out_of_office": note the return date and set a reminder to follow up after they return. Do NOT suggest contacting their colleagues or anyone else mentioned in the auto-reply — that is considered aggressive and can damage the relationship
 - For "objection": use the objection playbook to craft a response that addresses the specific concern
 - Keep responses concise, warm, and professional
 - Match the company voice style from the playbook${playbookContext}`,

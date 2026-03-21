@@ -10,9 +10,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { action } = body
 
+    if (!action) {
+      return NextResponse.json({ error: 'Missing required field: action' }, { status: 400 })
+    }
+
     // ACTION: Generate a 4-step outreach sequence
     if (action === 'generate_sequence') {
       const { prospect, voice_style, cta, product_info } = body
+
+      if (!prospect?.name || !prospect?.company || !prospect?.role) {
+        return NextResponse.json({ error: 'Missing required prospect fields: name, company, role' }, { status: 400 })
+      }
 
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
@@ -28,20 +36,22 @@ ${product_info ? `- Product: ${product_info.product_name || 'N/A'}
 - Problem solved: ${product_info.problem_solved || 'N/A'}
 - Differentiators: ${product_info.key_differentiators || 'N/A'}` : 'No product info provided — use generic AI SDR value props.'}
 
-PERSONALIZATION TOKENS — use these EXACTLY as written in the output:
+PERSONALIZATION TOKENS — use these EXACTLY as written in ALL messages (emails AND LinkedIn):
 - {{first_name}} for the prospect's first name
 - {{company}} for the prospect's company name
 - {{pain_point}} for an inferred pain point based on their role/company
 
+IMPORTANT: ALWAYS use {{first_name}}, {{company}}, and {{pain_point}} tokens instead of the prospect's actual name/company. Never hardcode the prospect's real name or company name in the output — always use the token form so messages work as reusable templates.
+
 RULES:
 - Step 1: Cold email (Day 1) — personalized opener referencing the prospect's role/company, concise value prop, clear CTA
-- Step 2: Follow-up email (Day 3) — different angle, add social proof or a stat, reference step 1
-- Step 3: LinkedIn message (Day 5) — max 300 characters, casual, reference the emails
-- Step 4: Final email (Day 10) — breakup email, create urgency, last chance framing
+- Step 2: Follow-up email (Day 3) — different angle, reference step 1. Use ONLY real product capabilities from the product context above — do NOT invent statistics, percentages, case studies, or customer testimonials. If you want to reference social proof, use qualitative language like "teams we work with report..." rather than fabricated numbers.
+- Step 3: LinkedIn message (Day 5) — max 300 characters, casual, reference the emails. MUST use {{first_name}} and {{company}} tokens, not the actual name.
+- Step 4: Final email (Day 10) — breakup email, graceful close, leave door open. Do NOT use artificial urgency tactics like "closing my calendar" or fake deadlines.
 - Each email should have a compelling subject line
 - LinkedIn messages do NOT have a subject line (set subject to empty string)
 - Keep emails under 150 words each
-- Include personalization tokens ({{first_name}}, {{company}}, {{pain_point}}) in the body where natural — but also use the actual prospect name/company for context since the tokens will be replaced at send time
+- Do NOT fabricate statistics, percentages, ROI numbers, or case studies. Only reference capabilities that are explicitly listed in the product context above.
 
 Return ONLY valid JSON, no backticks or markdown:
 {
@@ -98,14 +108,15 @@ Step purpose: ${stepDescriptions[step] || 'Outreach message'}
 
 ${context ? `Additional context: ${context}` : ''}
 
-PERSONALIZATION TOKENS — use these in the output:
+PERSONALIZATION TOKENS — ALWAYS use these in the output instead of actual names:
 - {{first_name}} for the prospect's first name
 - {{company}} for the prospect's company name
 - {{pain_point}} for their inferred pain point
 
 RULES:
 ${isLinkedIn ? '- LinkedIn message: max 300 characters, casual tone, no subject line' : '- Email: compelling subject line, under 150 words, personalized'}
-- Include personalization tokens where natural
+- ALWAYS use personalization tokens ({{first_name}}, {{company}}) — never hardcode the prospect's actual name or company
+- Do NOT fabricate statistics, case studies, or ROI numbers
 
 Return ONLY valid JSON, no backticks or markdown:
 {

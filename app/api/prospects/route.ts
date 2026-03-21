@@ -16,6 +16,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { action } = body
 
+    if (!action) {
+      return NextResponse.json({ error: 'Missing required field: action' }, { status: 400 })
+    }
+
     // ── Generate prospects from ICP ──────────────────────────────────
     if (action === 'generate') {
       const { user_id, icp: providedIcp } = body
@@ -72,12 +76,13 @@ Return ONLY a valid JSON array (no backticks, no markdown). Each object must hav
 }
 
 RULES:
-- Generate diverse names, companies, and titles
+- Generate diverse names, companies, and titles — include a mix of ethnicities, genders, and seniority levels
+- Company names MUST be creative and varied — do NOT follow a repetitive "[Industry]Tech [Suffix]" pattern. Use natural-sounding names like real startups: short names (Loom, Notion, Vanta), compound words (Datadog, Cloudflare), or distinctive names (Stripe, Figma). Each company name should feel unique.
 - Scores should vary realistically: 2-3 strong (80-95), 4-5 medium (50-79), 2-3 weaker (30-49)
-- match_reasons should be specific to WHY this prospect is a good ICP match — reference the product/problem if provided
-- Companies should sound realistic but be fictional (do NOT use real company names)
+- match_reasons MUST be specific and actionable — reference the exact product, pain point, or problem being solved. Never use generic filler like "growing company" or "scaling challenges." Each reason should explain a concrete connection between the prospect and the product.
+- Companies should sound realistic but be fictional (do NOT use real company names like Google, Stripe, etc.)
 - Email domains should match the company name (lowercase, no spaces)
-- Vary company sizes around the target but include some slightly outside range
+- company_size values MUST use the exact same format as the target ICP sizes (e.g. if target is "11-50", use "11-50" not "31-75" or "20-40"). High-scoring prospects should match the target sizes exactly; lower-scoring prospects may be slightly outside range but must still use standard ranges: 1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000
 - If geography is specified, prospects should be from that region${productContext}`,
         messages: [{
           role: 'user',
