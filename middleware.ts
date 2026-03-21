@@ -35,14 +35,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Already logged in — skip auth pages
+  // Already logged in — skip auth pages, route based on onboarding status
   const authPaths = ['/log-in', '/register']
   const isAuthPage = authPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
   if (isAuthPage && user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    const onboardingCompleted = user.user_metadata?.onboarding_completed === true
+    url.pathname = onboardingCompleted ? '/dashboard' : '/onboarding'
     return NextResponse.redirect(url)
+  }
+
+  // Dashboard gate — redirect to onboarding if not completed
+  const dashboardPaths = ['/dashboard', '/prospects', '/outreach', '/inbox']
+  const isDashboardPage = dashboardPaths.some(path => request.nextUrl.pathname.startsWith(path))
+
+  if (isDashboardPage && user) {
+    const onboardingCompleted = user.user_metadata?.onboarding_completed === true
+    if (!onboardingCompleted) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/onboarding'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

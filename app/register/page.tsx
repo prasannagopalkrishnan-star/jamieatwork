@@ -46,7 +46,7 @@ export default function AuthPage() {
       return
     }
 
-    window.location.href = '/dashboard'
+    window.location.href = '/onboarding'
   }
 
   return (
