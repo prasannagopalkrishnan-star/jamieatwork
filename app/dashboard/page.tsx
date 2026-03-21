@@ -435,10 +435,6 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#F8F7F4', color: '#1A1A1A' }}>
       <style>{`
-        @import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
-
         @keyframes fadeUp {
           from { transform: translateY(16px); opacity: 0 }
           to { transform: translateY(0); opacity: 1 }
@@ -479,14 +475,14 @@ export default function DashboardPage() {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none', color: '#1A1A1A' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', color: '#1A1A1A' }}>
             <div aria-hidden="true" style={{
               width: '28px', height: '28px', borderRadius: '8px',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'white', fontSize: '13px', fontWeight: 800,
               flexShrink: 0,
-            }}>J</div>
+            }}>j</div>
             <span style={{
               fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: '16px',
               fontWeight: 900, letterSpacing: '-.03em',

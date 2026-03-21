@@ -27,10 +27,6 @@ export default function Home() {
   return (
     <>
       <style>{`
-        @import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
-
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
         body { background: #F8F7F4; -webkit-font-smoothing: antialiased; }
@@ -105,15 +101,15 @@ export default function Home() {
           borderBottom: '1px solid rgba(0,0,0,.06)',
         }}>
           <div style={{ maxWidth: '1060px', margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none', color: '#1A1A1A' }}>
+            <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', color: '#1A1A1A' }}>
               <div aria-hidden="true" style={{
-                width: '30px', height: '30px', borderRadius: '9px',
+                width: '28px', height: '28px', borderRadius: '8px',
                 background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'white', fontSize: '14px', fontWeight: 800,
+                color: 'white', fontSize: '13px', fontWeight: 800,
                 fontFamily: "'Cabinet Grotesk', sans-serif",
                 flexShrink: 0,
-              }}>J</div>
+              }}>j</div>
               <span className="hd nav-logo-text" style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-.03em' }}>
                 amie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work
               </span>

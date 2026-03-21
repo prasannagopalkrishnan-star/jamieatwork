@@ -56,11 +56,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <style>{`
-        @import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
-      `}</style>
+      {/* Fonts loaded via layout.tsx */}
 
       <div style={{ minHeight: '100vh', background: '#F8F7F4', fontFamily: "'DM Sans', sans-serif" }}>
         {/* Nav */}
