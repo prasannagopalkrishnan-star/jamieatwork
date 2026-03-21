@@ -490,7 +490,7 @@ export default function DashboardPage() {
             <span style={{
               fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: '16px',
               fontWeight: 900, letterSpacing: '-.03em',
-            }}>jamie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work</span>
+            }}>amie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work</span>
           </Link>
           <span style={{
             fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#6B6B6B',

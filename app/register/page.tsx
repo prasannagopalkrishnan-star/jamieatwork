@@ -87,7 +87,7 @@ function AuthPageInner() {
             <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px', textDecoration: 'none', color: '#1A1A1A' }}>
               <div aria-hidden="true" style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'linear-gradient(135deg,#7C3AED,#EC4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '16px', fontWeight: 800, flexShrink: 0 }}>J</div>
               <span className="hd" style={{ fontSize: '19px', fontWeight: 800, letterSpacing: '-.03em' }}>
-                jamie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
+                amie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
               </span>
             </Link>
           </div>
@@ -136,10 +136,17 @@ function AuthPageInner() {
 
             {redirectPath && !error && (
               <div className="bd" style={{
-                padding: '10px 14px', borderRadius: '10px', marginBottom: '20px',
+                padding: '12px 14px', borderRadius: '10px', marginBottom: '20px',
                 background: '#F3F0FF', border: '1px solid #E9E5FF',
                 fontSize: '13px', color: '#7C3AED', fontWeight: 500,
-              }}>Sign in to continue</div>
+                lineHeight: 1.5,
+              }}>
+                <span style={{ fontWeight: 700 }}>Sign in to continue</span>
+                <br />
+                <span style={{ color: '#6B6B6B', fontWeight: 400 }}>
+                  You need to be logged in to access this page. Sign in or create an account to continue.
+                </span>
+              </div>
             )}
 
             {error && (

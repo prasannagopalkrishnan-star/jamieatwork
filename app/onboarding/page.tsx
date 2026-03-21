@@ -575,7 +575,17 @@ export default function OnboardingPage() {
                   type="checkbox"
                   checked={sel}
                   onChange={() => toggleArr('company_sizes', size)}
-                  style={{ display: 'none' }}
+                  style={{
+                    position: 'absolute',
+                    width: 1,
+                    height: 1,
+                    padding: 0,
+                    margin: -1,
+                    overflow: 'hidden',
+                    clip: 'rect(0,0,0,0)',
+                    whiteSpace: 'nowrap',
+                    borderWidth: 0,
+                  }}
                 />
                 <span style={{
                   width: 16,
@@ -698,7 +708,8 @@ export default function OnboardingPage() {
         {VOICE_STYLES.map(vs => {
           const sel = form.voice_style === vs.id
           return (
-            <div
+            <button
+              type="button"
               key={vs.id}
               onClick={() => setForm(prev => ({ ...prev, voice_style: vs.id }))}
               style={{
@@ -710,6 +721,7 @@ export default function OnboardingPage() {
                 transition: 'all 0.2s',
                 transform: sel ? 'translateY(-2px)' : 'none',
                 boxShadow: sel ? '0 6px 20px rgba(124,58,237,.12)' : '0 1px 3px rgba(0,0,0,.04)',
+                textAlign: 'left',
               }}
             >
               <div style={{ fontSize: 28, marginBottom: 8 }}>{vs.emoji}</div>
@@ -730,7 +742,7 @@ export default function OnboardingPage() {
               }}>
                 {vs.desc}
               </div>
-            </div>
+            </button>
           )
         })}
       </div>

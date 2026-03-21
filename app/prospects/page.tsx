@@ -339,7 +339,7 @@ export default function ProspectsPage() {
               flexShrink: 0,
             }}>J</div>
             <span className="hd" style={{ fontSize: '16px', fontWeight: 900, letterSpacing: '-.03em' }}>
-              jamie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
+              amie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
             </span>
           </Link>
           <span className="mn" style={{

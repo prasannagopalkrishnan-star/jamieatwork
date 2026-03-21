@@ -77,6 +77,13 @@ export default function Home() {
           .hero-headline { font-size: 40px !important; }
           .hero-ctas { flex-direction: column !important; align-items: center !important; }
           .section-inner { padding: 48px 20px !important; }
+          .nav-links { gap: 6px !important; }
+          .nav-links a { font-size: 12px !important; padding: 7px 10px !important; }
+        }
+        @media (max-width: 400px) {
+          .nav-links { gap: 4px !important; }
+          .nav-links a { font-size: 11px !important; padding: 6px 8px !important; white-space: nowrap; }
+          .nav-logo-text { font-size: 15px !important; }
         }
       `}</style>
 
@@ -107,11 +114,11 @@ export default function Home() {
                 fontFamily: "'Cabinet Grotesk', sans-serif",
                 flexShrink: 0,
               }}>J</div>
-              <span className="hd" style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-.03em' }}>
-                jamie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work
+              <span className="hd nav-logo-text" style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-.03em' }}>
+                amie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work
               </span>
             </Link>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="nav-links" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <Link href="/dashboard" className="bd cta-ghost" style={{
                 fontSize: '13px', padding: '8px 16px', borderRadius: '10px',
                 border: '1.5px solid rgba(0,0,0,.1)', background: 'white', color: '#1A1A1A',
