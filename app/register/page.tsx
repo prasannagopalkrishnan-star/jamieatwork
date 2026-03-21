@@ -83,9 +83,9 @@ function AuthPageInner() {
           {/* Logo */}
           <div className="r" style={{ textAlign: 'center', marginBottom: '32px' }}>
             <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none', color: '#1A1A1A' }}>
-              <div aria-hidden="true" style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'linear-gradient(135deg,#7C3AED,#EC4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '15px', fontWeight: 800, flexShrink: 0 }}>j</div>
+              <div aria-hidden="true" style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'linear-gradient(135deg,#7C3AED,#EC4899)', flexShrink: 0 }} />
               <span className="hd" style={{ fontSize: '19px', fontWeight: 800, letterSpacing: '-.03em' }}>
-                amie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
+                jamie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
               </span>
             </Link>
           </div>

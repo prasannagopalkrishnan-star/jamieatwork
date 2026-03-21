@@ -341,12 +341,10 @@ export default function ProspectsPage() {
             <div aria-hidden="true" style={{
               width: '28px', height: '28px', borderRadius: '8px',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: '13px', fontWeight: 800,
               flexShrink: 0,
-            }}>j</div>
+            }} />
             <span className="hd" style={{ fontSize: '16px', fontWeight: 900, letterSpacing: '-.03em' }}>
-              amie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
+              jamie<span style={{ color: '#C4B5FD', fontWeight: 500 }}>@</span>work
             </span>
           </Link>
           <span className="mn" style={{

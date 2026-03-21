@@ -479,14 +479,12 @@ export default function DashboardPage() {
             <div aria-hidden="true" style={{
               width: '28px', height: '28px', borderRadius: '8px',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: '13px', fontWeight: 800,
               flexShrink: 0,
-            }}>j</div>
+            }} />
             <span style={{
               fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: '16px',
               fontWeight: 900, letterSpacing: '-.03em',
-            }}>amie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work</span>
+            }}>jamie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work</span>
           </Link>
           <span style={{
             fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#6B6B6B',

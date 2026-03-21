@@ -73,12 +73,11 @@ export default function Home() {
           .hero-headline { font-size: 40px !important; }
           .hero-ctas { flex-direction: column !important; align-items: center !important; }
           .section-inner { padding: 48px 20px !important; }
-          .nav-links { gap: 6px !important; }
-          .nav-links a { font-size: 12px !important; padding: 7px 10px !important; }
+          .nav-links .nav-link-secondary { display: none !important; }
+          .nav-links a { font-size: 12px !important; padding: 7px 12px !important; }
         }
-        @media (max-width: 400px) {
-          .nav-links { gap: 4px !important; }
-          .nav-links a { font-size: 11px !important; padding: 6px 8px !important; white-space: nowrap; }
+        @media (max-width: 480px) {
+          .nav-links a { font-size: 12px !important; padding: 7px 10px !important; white-space: nowrap; }
           .nav-logo-text { font-size: 15px !important; }
         }
       `}</style>
@@ -105,17 +104,14 @@ export default function Home() {
               <div aria-hidden="true" style={{
                 width: '28px', height: '28px', borderRadius: '8px',
                 background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'white', fontSize: '13px', fontWeight: 800,
-                fontFamily: "'Cabinet Grotesk', sans-serif",
                 flexShrink: 0,
-              }}>j</div>
+              }} />
               <span className="hd nav-logo-text" style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-.03em' }}>
-                amie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work
+                jamie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work
               </span>
             </Link>
             <div className="nav-links" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <Link href="/dashboard" className="bd cta-ghost" style={{
+              <Link href="/dashboard" className="bd cta-ghost nav-link-secondary" style={{
                 fontSize: '13px', padding: '8px 16px', borderRadius: '10px',
                 border: '1.5px solid rgba(0,0,0,.1)', background: 'white', color: '#1A1A1A',
                 textDecoration: 'none', fontWeight: 600,
@@ -125,7 +121,7 @@ export default function Home() {
                 background: '#7C3AED', color: 'white',
                 textDecoration: 'none', fontWeight: 700, border: 'none',
                 boxShadow: '0 2px 8px rgba(124,58,237,.2)',
-              }}>Onboard Jamie in 10 min &rarr;</Link>
+              }}>Get Started &rarr;</Link>
             </div>
           </div>
         </nav>
