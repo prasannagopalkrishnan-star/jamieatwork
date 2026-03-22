@@ -17,104 +17,6 @@ const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY)
   : supabase
 
-// ── Apollo.io helpers ────────────────────────────────────────────────
-
-// Convert our "11-50" format to Apollo's "11,50" format
-function toApolloEmployeeRange(size: string): string {
-  return size.replace('-', ',')
-}
-
-// Map our ICP sizes to Apollo ranges
-function buildApolloEmployeeRanges(companySizes: string): string[] {
-  if (!companySizes) return []
-  return companySizes
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-    .map(toApolloEmployeeRange)
-}
-
-// Map our ICP roles to Apollo person_titles
-function buildApolloTitles(roles: string): string[] {
-  if (!roles) return ['CEO', 'VP of Sales', 'Head of Growth', 'Founder', 'COO']
-  return roles.split(',').map(r => r.trim()).filter(Boolean)
-}
-
-const DECISION_MAKER_SENIORITY = ['director', 'vp', 'c_suite', 'owner', 'founder', 'partner', 'manager']
-
-// Map our ICP geography to Apollo person_locations
-function buildApolloLocations(geography: string): string[] {
-  if (!geography) return ['United States']
-  return geography.split(',').map(g => g.trim()).filter(Boolean)
-}
-
-// Normalize Apollo employee count to our standard range format
-function toStandardSizeRange(numEmployees: number | null | undefined): string {
-  if (!numEmployees) return '11-50'
-  if (numEmployees <= 10) return '1-10'
-  if (numEmployees <= 50) return '11-50'
-  if (numEmployees <= 200) return '51-200'
-  if (numEmployees <= 500) return '201-500'
-  if (numEmployees <= 1000) return '501-1000'
-  if (numEmployees <= 5000) return '1001-5000'
-  return '5001+'
-}
-
-interface ApolloPersonResult {
-  name?: string
-  first_name?: string
-  last_name?: string
-  title?: string
-  email?: string
-  linkedin_url?: string
-  linkedin_uid?: string
-  city?: string
-  state?: string
-  organization?: {
-    name?: string
-    industry?: string
-    estimated_num_employees?: number
-    short_description?: string
-  }
-}
-
-async function searchApollo(icp: Record<string, string>): Promise<ApolloPersonResult[]> {
-  if (!process.env.APOLLO_API_KEY) return []
-
-  const titles = buildApolloTitles(icp.roles)
-  const seniority = DECISION_MAKER_SENIORITY
-  const industries = icp.industries
-    ? icp.industries.split(',').map((s: string) => s.trim()).filter(Boolean)
-    : undefined
-
-  console.log('Apollo search:', { titles, seniority, industries })
-
-  const res = await fetch('https://api.apollo.io/v1/people/search', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Api-Key': process.env.APOLLO_API_KEY!,
-    },
-    body: JSON.stringify({
-      person_titles: titles,
-      person_seniority_tags: seniority,
-      person_locations: buildApolloLocations(icp.geography),
-      organization_num_employees_ranges: buildApolloEmployeeRanges(icp.company_size),
-      q_organization_keyword_tags: industries,
-      page: 1,
-      per_page: 10,
-    }),
-  })
-
-  if (!res.ok) {
-    console.error(`Apollo API error: ${res.status} ${res.statusText}`)
-    return []
-  }
-
-  const data = await res.json()
-  return data.people || []
-}
-
 // ── Main handler ─────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -157,167 +59,70 @@ export async function POST(request: NextRequest) {
       const { industries, company_size, roles, geography, product_name, product_description, problem_solved } = icp
 
       const productContext = product_name
-        ? `\nThe user's product context (use this to make match_reasons specific to this product):
+        ? `\nProduct being sold (use this to make match_reasons and pain_points specific):
 - Product: ${product_name}
 - Description: ${product_description || 'N/A'}
 - Problem solved: ${problem_solved || 'N/A'}`
         : ''
 
-      // ── Step 1: Try Apollo.io for real contact data ──────────────
-      let prospects: Record<string, unknown>[] = []
-      let source: 'apollo' | 'ai' = 'ai'
+      const targetTitles = roles || 'CEO, VP of Sales, CRO, Head of Growth, Founder'
 
-      try {
-        const apolloPeople = await searchApollo(icp)
-
-        if (apolloPeople.length > 0) {
-          // Map Apollo results to our schema (without score/reasons yet)
-          const apolloProspects = apolloPeople
-            .filter(p => {
-              if (!p.name && !(p.first_name && p.last_name)) return false
-              // Skip prospects with no LinkedIn presence
-              if (!p.linkedin_url && !p.linkedin_uid) return false
-              return true
-            })
-            .map(p => ({
-              name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-              title: p.title || 'Unknown Title',
-              company: p.organization?.name || 'Unknown Company',
-              email: p.email || '',
-              linkedin_url: p.linkedin_url || (p.linkedin_uid ? `https://www.linkedin.com/in/${p.linkedin_uid}` : ''),
-              industry: p.organization?.industry || '',
-              company_size: toStandardSizeRange(p.organization?.estimated_num_employees),
-              location: [p.city, p.state].filter(Boolean).join(', '),
-              org_description: p.organization?.short_description || '',
-            }))
-
-          if (apolloProspects.length > 0) {
-            // ── Step 2: Use Claude to score Apollo results against ICP ──
-            const scoreResponse = await anthropic.messages.create({
-              model: 'claude-sonnet-4-20250514',
-              max_tokens: 3000,
-              system: `You are a B2B sales research assistant. You are given REAL prospect data from Apollo.io and an ICP. Score each prospect on how well they match the ICP and explain why.
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 5000,
+        system: `You are a B2B sales research assistant. Generate exactly 10 realistic prospect profiles based on the given ICP (Ideal Customer Profile). Each prospect should be a senior decision-maker at a fictional but realistic company.
 ${productContext}
-
-Return ONLY a valid JSON array (no backticks, no markdown). For each prospect, return:
-{
-  "index": 0,
-  "score": number 0-100,
-  "match_reasons": ["reason 1", "reason 2", "reason 3"]
-}
-
-RULES:
-- score reflects how closely the person's title, company industry, and company size match the target ICP
-- match_reasons MUST be specific: reference the prospect's actual title, company, industry, and how they relate to the product being sold
-- Do NOT use generic filler like "growing company" or "scaling challenges"
-- If the product context is provided, explain why THIS prospect would benefit from THAT specific product`,
-              messages: [{
-                role: 'user',
-                content: `Score these ${apolloProspects.length} real prospects against this ICP:
-
-ICP:
-- Target Industries: ${industries || 'SaaS, Technology'}
-- Company Size: ${company_size || '11-50 employees'}
-- Target Roles: ${roles || 'Founders, CEOs, VPs of Sales'}
-- Geography: ${geography || 'United States'}
-
-Prospects:
-${apolloProspects.map((p, i) => `[${i}] ${p.name} — ${p.title} at ${p.company} (${p.industry || 'unknown industry'}, ${p.company_size} employees, ${p.location || 'unknown location'})${p.org_description ? ` — "${p.org_description}"` : ''}`).join('\n')}
-
-Return the JSON array now.`,
-              }],
-            })
-
-            const scoreText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '[]'
-            const scoreCleaned = scoreText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-
-            let scores: { index: number; score: number; match_reasons: string[] }[] = []
-            try {
-              scores = JSON.parse(scoreCleaned)
-            } catch {
-              // If scoring fails, assign default scores
-              scores = apolloProspects.map((_, i) => ({
-                index: i,
-                score: 60,
-                match_reasons: ['Matched via Apollo.io based on ICP criteria'],
-              }))
-            }
-
-            // Merge Apollo data with Claude scores
-            prospects = apolloProspects.map((p, i) => {
-              const s = scores.find(sc => sc.index === i) || { score: 50, match_reasons: ['Matched via Apollo.io'] }
-              return {
-                name: p.name,
-                title: p.title,
-                company: p.company,
-                email: p.email,
-                linkedin_url: p.linkedin_url,
-                score: s.score,
-                match_reasons: s.match_reasons,
-                industry: p.industry || industries?.split(',')[0]?.trim() || 'Technology',
-                company_size: p.company_size,
-              }
-            })
-            source = 'apollo'
-          }
-        }
-      } catch (err) {
-        console.error('Apollo enrichment failed, falling back to AI generation:', err)
-        // Fall through to Claude generation below
-      }
-
-      // ── Step 3: Fall back to Claude-generated prospects if Apollo didn't work ──
-      if (prospects.length === 0) {
-        const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
-          system: `You are a B2B sales research assistant. Generate exactly 10 realistic prospect profiles based on the given ICP (Ideal Customer Profile). Each prospect should feel like a real person at a real company.
 
 Return ONLY a valid JSON array (no backticks, no markdown). Each object must have:
 {
   "name": "Full Name",
-  "title": "Job Title",
-  "company": "Company Name",
-  "email": "realistic email using firstname.lastname@companydomain.com format",
-  "linkedin_url": "https://linkedin.com/in/firstname-lastname",
-  "score": number 0-100 representing ICP match quality,
-  "match_reasons": ["reason 1", "reason 2", "reason 3"],
-  "industry": "industry name",
-  "company_size": "e.g. 11-50, 51-200, etc."
+  "title": "Senior decision-maker title (VP, Director, C-suite, Founder, Head of)",
+  "company": "Realistic fictional company name",
+  "email": "firstname.lastname@companydomain.com",
+  "linkedin_url": "https://www.linkedin.com/search/results/people/?keywords=FirstName%20LastName%20CompanyName",
+  "score": number 1-100,
+  "reasoning": "One sentence on why they are a good ICP match",
+  "match_reasons": ["specific reason 1", "specific reason 2", "specific reason 3"],
+  "pain_points": ["pain point 1", "pain point 2"],
+  "industry": "specific industry name",
+  "company_size": "employee range",
+  "location": "City, State"
 }
 
 RULES:
-- Generate diverse names, companies, and titles — include a mix of ethnicities, genders, and seniority levels
-- Company names MUST be creative and varied — do NOT follow a repetitive "[Industry]Tech [Suffix]" pattern. Use natural-sounding names like real startups: short names (Loom, Notion, Vanta), compound words (Datadog, Cloudflare), or distinctive names (Stripe, Figma). Each company name should feel unique.
-- Scores should vary realistically: 2-3 strong (80-95), 4-5 medium (50-79), 2-3 weaker (30-49)
-- match_reasons MUST be specific and actionable — reference the exact product, pain point, or problem being solved. Never use generic filler like "growing company" or "scaling challenges." Each reason should explain a concrete connection between the prospect and the product.
-- Companies should sound realistic but be fictional (do NOT use real company names like Google, Stripe, etc.)
-- Email domains should match the company name (lowercase, no spaces)
-- company_size values MUST use the exact same format as the target ICP sizes (e.g. if target is "11-50", use "11-50" not "31-75" or "20-40"). High-scoring prospects should match the target sizes exactly; lower-scoring prospects may be slightly outside range but must still use standard ranges: 1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000
-- If geography is specified, prospects should be from that region${productContext}`,
-          messages: [{
-            role: 'user',
-            content: `Generate 10 prospect profiles for this ICP:
+- Titles MUST be senior decision-makers only: VP, Director, C-suite, Founder, Head of, Partner. Never junior titles.
+- Names must be diverse — mix of ethnicities, genders, and backgrounds
+- Company names MUST be creative and varied — use natural-sounding startup names like Loom, Notion, Vanta, Datadog, Figma. Never use "[Industry]Tech" patterns. Each name must feel unique and real.
+- linkedin_url MUST be a LinkedIn people search URL: https://www.linkedin.com/search/results/people/?keywords=FirstName%20LastName%20CompanyName (URL-encode spaces as %20). This lets the user find real people matching the profile.
+- Email domains must match the company name (lowercase, no spaces, e.g. acme.com, vantahealth.com)
+- Scores should vary: 2-3 strong (80-95), 4-5 medium (50-79), 2-3 weaker (30-49)
+- match_reasons MUST be specific and actionable — reference the exact product, pain point, or problem. Never use generic filler like "growing company" or "scaling challenges."
+- pain_points must be specific to the prospect's role and industry — what keeps them up at night that the product solves
+- company_size values MUST use standard ranges: 1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000. High-scoring prospects should match the target sizes exactly.
+- location must be a real US city and state (e.g. "Austin, TX", "San Francisco, CA")`,
+        messages: [{
+          role: 'user',
+          content: `Generate 10 sales prospects for this ICP:
 - Target Industries: ${industries || 'SaaS, Technology'}
 - Company Size: ${company_size || '11-50 employees'}
-- Target Roles: ${roles || 'Founders, CEOs, VPs of Sales'}
+- Target Titles (decision makers): ${targetTitles}
 - Geography: ${geography || 'United States'}
 
 Return the JSON array now.`,
-          }],
-        })
+        }],
+      })
 
-        const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
-        const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
 
-        try {
-          prospects = JSON.parse(cleaned)
-        } catch {
-          return NextResponse.json({ prospects: [], error: 'Could not parse prospect data' }, { status: 500 })
-        }
+      let prospects: Record<string, unknown>[]
+      try {
+        prospects = JSON.parse(cleaned)
+      } catch {
+        return NextResponse.json({ prospects: [], error: 'Could not parse prospect data' }, { status: 500 })
       }
 
-      // ── Step 4: Save to Supabase ──────────────────────────────────
+      // Save to Supabase
       if (user_id && prospects.length > 0) {
         const rows = prospects.map((p: Record<string, unknown>) => ({
           user_id,
@@ -331,7 +136,6 @@ Return the JSON array now.`,
           industry: p.industry,
           company_size: p.company_size,
           status: 'new',
-          source,
         }))
 
         const { data: saved, error } = await supabaseAdmin
@@ -341,13 +145,13 @@ Return the JSON array now.`,
 
         if (error) {
           console.error('Supabase insert error:', error)
-          return NextResponse.json({ prospects, source, saved: false })
+          return NextResponse.json({ prospects, saved: false })
         }
 
-        return NextResponse.json({ prospects: saved, source, saved: true })
+        return NextResponse.json({ prospects: saved, saved: true })
       }
 
-      return NextResponse.json({ prospects, source, saved: false })
+      return NextResponse.json({ prospects, saved: false })
     }
 
     // ── List prospects with pagination + filters ─────────────────────
