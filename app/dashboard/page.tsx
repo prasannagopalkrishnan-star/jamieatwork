@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useState, useEffect, useCallback } from 'react'
 import { TRUST_STAGES, getStage, getNextUnlockProgress, type TrustProgress, type ActivityLogEntry } from '@/lib/trust'
+import { useOnboardingProfile } from '@/app/hooks/useOnboardingProfile'
 
 // ─── Types ───
 interface DashboardData {
@@ -395,6 +396,15 @@ export default function DashboardPage() {
     stage_unlocked_at: null,
   })
   const [localLog, setLocalLog] = useState<ActivityLogEntry[]>([])
+  const { profile: onboardingProfile } = useOnboardingProfile()
+
+  // Extract domain for favicon
+  const startupDomain = (() => {
+    try {
+      if (onboardingProfile?.website) return new URL(onboardingProfile.website).hostname
+    } catch { /* invalid URL */ }
+    return null
+  })()
 
   // Fetch dashboard data
   useEffect(() => {
@@ -476,15 +486,32 @@ export default function DashboardPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', color: '#1A1A1A' }}>
+            {startupDomain ? (
+              <img
+                src={`https://www.google.com/s2/favicons?domain=${startupDomain}&sz=64`}
+                alt=""
+                width={28}
+                height={28}
+                style={{ borderRadius: '8px', flexShrink: 0 }}
+                onError={(e) => {
+                  const el = e.currentTarget
+                  el.style.display = 'none'
+                  const fallback = el.nextElementSibling as HTMLElement | null
+                  if (fallback) fallback.style.display = 'flex'
+                }}
+              />
+            ) : null}
             <div aria-hidden="true" style={{
               width: '28px', height: '28px', borderRadius: '8px',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)',
               flexShrink: 0,
+              display: startupDomain ? 'none' : 'flex',
+              alignItems: 'center', justifyContent: 'center',
             }} />
             <span style={{
               fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: '16px',
               fontWeight: 900, letterSpacing: '-.03em',
-            }}>jamie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work</span>
+            }}>{onboardingProfile?.product_name || (<>jamie<span style={{ color: '#FDA4AF', fontWeight: 500 }}>@</span>work</>)}</span>
           </Link>
           <span style={{
             fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#6B6B6B',
@@ -508,6 +535,48 @@ export default function DashboardPage() {
 
       {/* Content */}
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 24px 64px' }}>
+
+        {/* ─── Welcome Banner ─── */}
+        {onboardingProfile?.product_name && (
+          <div className="fade-up" style={{
+            display: 'flex', alignItems: 'center', gap: '16px',
+            padding: '16px 20px', marginBottom: '20px', borderRadius: '14px',
+            background: 'white', border: '1px solid rgba(0,0,0,.06)',
+          }}>
+            {startupDomain ? (
+              <img
+                src={`https://www.google.com/s2/favicons?domain=${startupDomain}&sz=64`}
+                alt=""
+                width={36}
+                height={36}
+                style={{ borderRadius: '8px', flexShrink: 0 }}
+              />
+            ) : (
+              <div style={{
+                width: '36px', height: '36px', borderRadius: '8px',
+                background: 'linear-gradient(135deg,#7C3AED,#EC4899)',
+                flexShrink: 0,
+              }} />
+            )}
+            <div style={{ minWidth: 0 }}>
+              <p style={{
+                fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: '15px',
+                fontWeight: 800, letterSpacing: '-.02em', margin: 0, color: '#1A1A1A',
+              }}>
+                Welcome back — Jamie is selling for {onboardingProfile.product_name}
+              </p>
+              {onboardingProfile.product_description && (
+                <p style={{
+                  fontFamily: "'DM Sans', sans-serif", fontSize: '13px',
+                  fontWeight: 500, color: '#6B6B6B', margin: '2px 0 0 0',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  &ldquo;{onboardingProfile.product_description.split('.')[0]}&rdquo;
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ─── Trust Stage Card ─── */}
         <div className="fade-up" style={{ marginBottom: '20px' }}>
