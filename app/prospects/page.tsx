@@ -76,14 +76,19 @@ export default function ProspectsPage() {
 
   const loadFilters = async (uid: string | null) => {
     try {
-      const res = await fetch('/api/prospects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'filters', user_id: uid }),
-      })
-      const data = await res.json()
-      setFilterIndustries(data.industries || [])
-      setFilterSizes(data.sizes || [])
+      const supabase = createClient()
+      let industryQuery = supabase.from('prospects').select('industry')
+      let sizeQuery = supabase.from('prospects').select('company_size')
+
+      if (uid) {
+        industryQuery = industryQuery.eq('user_id', uid)
+        sizeQuery = sizeQuery.eq('user_id', uid)
+      }
+
+      const [{ data: industries }, { data: sizes }] = await Promise.all([industryQuery, sizeQuery])
+
+      setFilterIndustries([...new Set((industries || []).map((r: { industry: string }) => r.industry))].sort())
+      setFilterSizes([...new Set((sizes || []).map((r: { company_size: string }) => r.company_size))].sort())
     } catch {
       // Use client-side derived filters as fallback
     }
@@ -93,30 +98,49 @@ export default function ProspectsPage() {
     if (loadingMore.current && !reset) return
     loadingMore.current = true
 
+    const limit = 10
     try {
-      const res = await fetch('/api/prospects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'list',
-          user_id: uid,
-          offset,
-          limit: 10,
-          score_filter: scoreFilter !== 'all' ? scoreFilter : undefined,
-          industry_filter: industryFilter,
-          size_filter: sizeFilter,
-          search: searchDebounced || undefined,
-        }),
-      })
-      const data = await res.json()
+      const supabase = createClient()
+      let query = supabase
+        .from('prospects')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+
+      if (uid) query = query.eq('user_id', uid)
+
+      // Score filter
+      if (scoreFilter === '80+') query = query.gte('score', 80)
+      else if (scoreFilter === '50-79') query = query.gte('score', 50).lt('score', 80)
+      else if (scoreFilter === 'below50') query = query.lt('score', 50)
+
+      // Industry filter
+      if (industryFilter && industryFilter !== 'all') query = query.eq('industry', industryFilter)
+
+      // Size filter
+      if (sizeFilter && sizeFilter !== 'all') query = query.eq('company_size', sizeFilter)
+
+      // Text search
+      if (searchDebounced) {
+        query = query.or(`name.ilike.%${searchDebounced}%,company.ilike.%${searchDebounced}%,title.ilike.%${searchDebounced}%,email.ilike.%${searchDebounced}%`)
+      }
+
+      // Pagination
+      query = query.range(offset, offset + limit - 1)
+
+      const { data, count, error } = await query
+
+      if (error) {
+        console.error('Failed to load prospects:', error)
+        return
+      }
 
       if (reset) {
-        setProspects(data.prospects || [])
+        setProspects(data || [])
       } else {
-        setProspects(prev => [...prev, ...(data.prospects || [])])
+        setProspects(prev => [...prev, ...(data || [])])
       }
-      setTotal(data.total || 0)
-      setHasMore(data.has_more || false)
+      setTotal(count || 0)
+      setHasMore((count || 0) > offset + limit)
     } catch (err) {
       console.error('Failed to load prospects:', err)
     } finally {
