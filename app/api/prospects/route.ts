@@ -215,7 +215,7 @@ async function discoverViaGemini(
   // Retry once on 429
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -331,50 +331,48 @@ async function mapDecisionMakers(
 ): Promise<Map<string, TitleMapping>> {
   const results = new Map<string, TitleMapping>()
 
-  // Batch companies into groups of 5 for efficiency
-  const batches: DiscoveredCompany[][] = []
-  for (let i = 0; i < companies.length; i += 5) {
-    batches.push(companies.slice(i, i + 5))
-  }
+  // Single Claude call for ALL companies to avoid rate limiting
+  const companySummaries = companies.map((c, i) =>
+    `${i + 1}. ${c.company_name} (${c.industry}, ${c.employee_count})`
+  ).join('\n')
 
-  await Promise.all(batches.map(async (batch) => {
-    const companySummaries = batch.map((c, i) =>
-      `${i + 1}. ${c.company_name} (${c.industry}, ~${c.employee_count} employees)`
-    ).join('\n')
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4000,
+    messages: [{
+      role: 'user',
+      content: `You are a B2B sales researcher mapping decision makers.
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: `For each company below, determine who would be the best buyer for this product:
-Product: ${profile.product_name} — ${profile.product_description}
-Suggested target titles: ${profile.target_titles || 'CEO, VP Sales, Head of Growth'}
+Product being sold: ${profile.product_name} — ${profile.product_description}
+Target titles: ${profile.target_titles || 'CEO, VP Sales, Head of Growth'}
+
+For each company below, identify the best decision maker title based on company size.
+Small companies (<50 employees): C-suite buyer
+Medium (50-500): VP/Director buyer
+Large (500+): Director/Sr Director buyer
 
 Companies:
 ${companySummaries}
 
-Consider company size — small companies (<50) have C-suite buyers, large companies (200+) have VP/Director buyers.
-
-Return ONLY a JSON array with one object per company:
+Return ONLY a JSON array with one entry per company:
 [{
-  "company_name": "exact company name",
-  "primary_title": "exact title",
+  "company_name": "exact company name from list",
+  "primary_title": "best decision maker title",
   "secondary_title": "backup title",
-  "reasoning": "one sentence why"
+  "reasoning": "one sentence"
 }]`,
-      }],
-    })
+    }],
+  })
 
-    const mappings = extractJSON(extractTextFromClaude(response)) as Array<TitleMapping & { company_name: string }>
-    for (const m of mappings) {
-      results.set(m.company_name.toLowerCase(), {
-        primary_title: m.primary_title,
-        secondary_title: m.secondary_title,
-        reasoning: m.reasoning,
-      })
-    }
-  }))
+  const mappings = extractJSON(extractTextFromClaude(response)) as Array<TitleMapping & { company_name: string }>
+  console.log(`[Stage 2] Mapped ${mappings.length} decision makers in 1 Claude call`)
+  for (const m of mappings) {
+    results.set(m.company_name.toLowerCase(), {
+      primary_title: m.primary_title,
+      secondary_title: m.secondary_title,
+      reasoning: m.reasoning,
+    })
+  }
 
   return results
 }
@@ -394,109 +392,110 @@ async function resolveContacts(
   match_reasons: string[]
   talking_points: string[]
 }>> {
-  // Process in batches of 5 for parallelism without overwhelming APIs
-  const results: Array<{
-    company: DiscoveredCompany
-    title: TitleMapping
-    contact: ResolvedContact
-    pain_points: string[]
-    match_reasons: string[]
-    talking_points: string[]
-  }> = []
+  // Build lookup list with title mappings
+  const lookups = companies.map(company => {
+    const titleMapping = titleMap.get(company.company_name.toLowerCase()) || {
+      primary_title: profile.target_titles?.split(',')[0]?.trim() || 'CEO',
+      secondary_title: 'Head of Growth',
+      reasoning: 'Default mapping',
+    }
+    return { company, titleMapping }
+  })
 
-  const batches: DiscoveredCompany[][] = []
-  for (let i = 0; i < companies.length; i += 5) {
-    batches.push(companies.slice(i, i + 5))
-  }
+  // Single batched web search call for ALL contacts
+  const searchList = lookups.map(l =>
+    `- ${l.titleMapping.primary_title} at ${l.company.company_name} (${l.company.website})`
+  ).join('\n')
 
-  for (const batch of batches) {
-    const batchResults = await Promise.all(batch.map(async (company) => {
-      const titleMapping = titleMap.get(company.company_name.toLowerCase()) || {
-        primary_title: profile.target_titles?.split(',')[0]?.trim() || 'CEO',
-        secondary_title: 'Head of Growth',
-        reasoning: 'Default mapping',
-      }
+  const contactMap = new Map<string, ResolvedContact>()
 
-      // Step A: Web search for real person
-      let contact: ResolvedContact = {
-        name: null,
-        email: null,
-        phone: null,
-        linkedin_url: null,
-        confidence: 'low',
-        source: 'inferred',
-      }
+  try {
+    const searchResult = await withTimeout(
+      anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{
+          role: 'user',
+          content: `Search for decision makers at these companies and find their names, LinkedIn profiles, and emails if publicly available:
 
-      try {
-        const searchResult = await withTimeout(
-          anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1500,
-            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-            messages: [{
-              role: 'user',
-              content: `Search for the ${titleMapping.primary_title} at ${company.company_name} (${company.website}).
-Find their full name, LinkedIn profile URL, and email if publicly available.
-If you can't find the ${titleMapping.primary_title}, try ${titleMapping.secondary_title}.
+${searchList}
 
-Return ONLY JSON (no markdown):
-{
+Return ONLY a JSON array with one entry per company:
+[{
+  "company_name": "exact company name",
   "name": "full name or null",
   "email": "email or null",
   "phone": "phone or null",
   "linkedin_url": "direct LinkedIn profile URL or null",
-  "confidence": "high/medium/low",
-  "source": "where you found this"
-}`,
-            }],
-          }),
-          10000,
-          `Contact search: ${company.company_name}`
-        )
+  "confidence": "high/medium/low"
+}]`,
+        }],
+      }),
+      60000,
+      'Stage 3 batch contact search'
+    )
 
-        if (searchResult) {
-          const parsed = extractJSONObject<ResolvedContact>(
-            extractTextFromClaude(searchResult),
-            contact
-          )
-          contact = { ...contact, ...parsed }
+    if (searchResult) {
+      const contacts = extractJSON(extractTextFromClaude(searchResult)) as Array<ResolvedContact & { company_name: string }>
+      console.log(`[Stage 3] Batch web search resolved ${contacts.length} contacts in 1 call`)
+      for (const c of contacts) {
+        if (c.company_name) {
+          contactMap.set(c.company_name.toLowerCase(), {
+            name: c.name || null,
+            email: c.email || null,
+            phone: c.phone || null,
+            linkedin_url: c.linkedin_url || null,
+            confidence: c.confidence || 'low',
+            source: 'web_search',
+          })
         }
-      } catch (err) {
-        console.warn(`Contact search failed for ${company.company_name}:`, err)
       }
-
-      // Step B: LinkedIn search URL fallback
-      if (!contact.linkedin_url && contact.name) {
-        contact.linkedin_url = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.name + ' ' + company.company_name)}`
-      } else if (!contact.linkedin_url) {
-        contact.linkedin_url = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(titleMapping.primary_title + ' ' + company.company_name)}`
-      }
-
-      // Step C: Email pattern inference
-      if (!contact.email && contact.name) {
-        const domain = domainFromWebsite(company.website)
-        const { email } = inferEmail(contact.name, domain)
-        contact.email = email
-      }
-
-      // Generate pain points and match reasons specific to this prospect
-      const pain_points = analysis.pain_points.slice(0, 3)
-      const match_reasons = [
-        `${company.company_name} operates in ${company.industry} — direct ICP match for ${profile.product_name}`,
-        `${titleMapping.primary_title} at a ${company.employee_count}-person company is the ideal buyer`,
-        titleMapping.reasoning,
-      ]
-      const talking_points = [
-        `Reference their ${company.industry} focus and how ${profile.product_name} solves ${analysis.pain_points[0] || 'their key challenge'}`,
-        `Mention companies similar to ${company.company_name} that benefit from ${profile.product_name}`,
-      ]
-
-      return { company, title: titleMapping, contact, pain_points, match_reasons, talking_points }
-    }))
-
-    results.push(...batchResults)
+    }
+  } catch (err) {
+    console.warn('[Stage 3] Batch contact search failed:', err)
   }
 
+  // Assemble results with fallbacks
+  const results = lookups.map(({ company, titleMapping }) => {
+    let contact: ResolvedContact = contactMap.get(company.company_name.toLowerCase()) || {
+      name: null,
+      email: null,
+      phone: null,
+      linkedin_url: null,
+      confidence: 'low',
+      source: 'inferred',
+    }
+
+    // LinkedIn search URL fallback
+    if (!contact.linkedin_url && contact.name) {
+      contact = { ...contact, linkedin_url: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.name + ' ' + company.company_name)}` }
+    } else if (!contact.linkedin_url) {
+      contact = { ...contact, linkedin_url: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(titleMapping.primary_title + ' ' + company.company_name)}` }
+    }
+
+    // Email pattern inference
+    if (!contact.email && contact.name) {
+      const domain = domainFromWebsite(company.website)
+      const { email } = inferEmail(contact.name, domain)
+      contact = { ...contact, email }
+    }
+
+    const pain_points = analysis.pain_points.slice(0, 3)
+    const match_reasons = [
+      `${company.company_name} operates in ${company.industry} — direct ICP match for ${profile.product_name}`,
+      `${titleMapping.primary_title} at a ${company.employee_count}-person company is the ideal buyer`,
+      titleMapping.reasoning,
+    ]
+    const talking_points = [
+      `Reference their ${company.industry} focus and how ${profile.product_name} solves ${analysis.pain_points[0] || 'their key challenge'}`,
+      `Mention companies similar to ${company.company_name} that benefit from ${profile.product_name}`,
+    ]
+
+    return { company, title: titleMapping, contact, pain_points, match_reasons, talking_points }
+  })
+
+  console.log(`[Stage 3] ${results.filter(r => r.contact.name).length}/${results.length} contacts have real names`)
   return results
 }
 
