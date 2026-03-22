@@ -266,6 +266,33 @@ export default function ProspectsPage() {
     return [...new Set(prospects.map(p => p.company_size))].sort()
   }, [filterSizes, prospects])
 
+  // Track which cards have expanded match reasons
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
+  const toggleExpanded = (id: string) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // Group prospects by company for "More at this company" chips
+  const companyPeers = useMemo(() => {
+    const map = new Map<string, Prospect[]>()
+    for (const p of prospects) {
+      const key = p.company.toLowerCase()
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(p)
+    }
+    return map
+  }, [prospects])
+
+  const displayName = (name: string) => {
+    if (!name || name.includes(' at ')) return 'Contact TBD'
+    return name
+  }
+
   const scoreColor = (score: number) => {
     if (score >= 80) return '#16A34A'
     if (score >= 50) return '#D97706'
@@ -347,6 +374,17 @@ export default function ProspectsPage() {
         .fade-in {
           animation: fadeUp 0.4s cubic-bezier(.22,1,.36,1) forwards;
           opacity: 0;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .truncate {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         @media (max-width: 700px) {
           .prospect-grid {
@@ -514,25 +552,23 @@ export default function ProspectsPage() {
           <div className="prospect-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             {[...Array(6)].map((_, i) => (
               <div key={i} style={{
-                background: 'white', borderRadius: '16px', padding: '24px',
+                background: 'white', borderRadius: '14px', padding: '16px',
                 border: '1px solid rgba(0,0,0,.06)',
               }}>
-                <div style={{ display: 'flex', gap: '14px', marginBottom: '14px' }}>
-                  <div className="skeleton" style={{ width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0 }} />
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                  <div className="skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
-                    <div className="skeleton" style={{ height: '18px', width: '60%', marginBottom: '6px' }} />
-                    <div className="skeleton" style={{ height: '14px', width: '80%', marginBottom: '4px' }} />
-                    <div className="skeleton" style={{ height: '14px', width: '45%' }} />
+                    <div className="skeleton" style={{ height: '16px', width: '55%', marginBottom: '5px' }} />
+                    <div className="skeleton" style={{ height: '12px', width: '70%', marginBottom: '4px' }} />
+                    <div className="skeleton" style={{ height: '13px', width: '40%' }} />
                   </div>
                 </div>
-                <div className="skeleton" style={{ height: '28px', width: '60px', marginBottom: '14px', borderRadius: '20px' }} />
-                <div className="skeleton" style={{ height: '12px', width: '90%', marginBottom: '6px' }} />
-                <div className="skeleton" style={{ height: '12px', width: '75%', marginBottom: '6px' }} />
-                <div className="skeleton" style={{ height: '12px', width: '60%', marginBottom: '20px' }} />
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div className="skeleton" style={{ height: '34px', width: '80px' }} />
-                  <div className="skeleton" style={{ height: '34px', width: '60px' }} />
-                  <div className="skeleton" style={{ height: '34px', width: '100px' }} />
+                <div className="skeleton" style={{ height: '12px', width: '85%', marginBottom: '5px' }} />
+                <div className="skeleton" style={{ height: '12px', width: '65%', marginBottom: '14px' }} />
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <div className="skeleton" style={{ height: '30px', width: '70px' }} />
+                  <div className="skeleton" style={{ height: '30px', width: '50px' }} />
+                  <div className="skeleton" style={{ height: '30px', width: '80px' }} />
                 </div>
               </div>
             ))}
@@ -576,107 +612,112 @@ export default function ProspectsPage() {
         {prospects.length > 0 && (
           <>
             <div className="prospect-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {prospects.map((prospect, i) => (
+              {prospects.map((prospect, i) => {
+                const cardId = prospect.id || String(i)
+                const name = displayName(prospect.name)
+                const isExpanded = expandedCards.has(cardId)
+                const reasons = prospect.match_reasons || []
+                const visibleReasons = isExpanded ? reasons : reasons.slice(0, 2)
+                const hasMoreReasons = reasons.length > 2
+
+                // Company peers (excluding self)
+                const peers = (companyPeers.get(prospect.company.toLowerCase()) || [])
+                  .filter(p => p.id !== prospect.id)
+                  .slice(0, 2)
+
+                return (
                 <div
-                  key={prospect.id || i}
+                  key={cardId}
                   className="prospect-card fade-in"
                   style={{
                     background: cardBg(prospect.status),
-                    borderRadius: '16px',
-                    padding: '24px',
+                    borderRadius: '14px',
+                    padding: '16px',
                     border: `1px solid ${cardBorder(prospect.status)}`,
                     boxShadow: '0 1px 3px rgba(0,0,0,.04)',
                     opacity: prospect.status === 'skipped' ? 0.6 : 1,
                     animationDelay: `${(i % 10) * 50}ms`,
+                    overflow: 'hidden',
                   }}
                 >
-                  {/* Avatar + Name row */}
-                  <div style={{ display: 'flex', gap: '14px', marginBottom: '14px' }}>
+                  {/* Avatar + Name/Title/Company */}
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '10px' }}>
                     <div style={{
-                      width: '44px', height: '44px', borderRadius: '50%',
+                      width: '40px', height: '40px', borderRadius: '50%',
                       background: avatarGradient(prospect.name),
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'white', fontSize: '15px', fontWeight: 800,
+                      color: 'white', fontSize: '14px', fontWeight: 800,
                       flexShrink: 0, letterSpacing: '-.02em',
                     }}>
-                      {initials(prospect.name)}
+                      {initials(name)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 className="hd" style={{
-                        fontSize: '17px', fontWeight: 800, margin: 0,
-                        letterSpacing: '-.02em', overflow: 'hidden',
-                        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      <h3 className="hd truncate" style={{
+                        fontSize: '16px', fontWeight: 800, margin: 0,
+                        letterSpacing: '-.02em',
+                        color: name === 'Contact TBD' ? '#A3A3A3' : '#1A1A1A',
                       }}>
-                        {prospect.name}
+                        {name}
                       </h3>
-                      <p className="bd" style={{
-                        fontSize: '13px', color: '#6B6B6B', margin: '1px 0 0 0', fontWeight: 500,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      <p className="bd truncate" style={{
+                        fontSize: '12px', color: '#6B6B6B', margin: '1px 0 0 0', fontWeight: 500,
                       }}>
                         {prospect.title}
                       </p>
-                      <p className="bd" style={{
-                        fontSize: '14px', color: '#1A1A1A', margin: '1px 0 0 0', fontWeight: 700,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      <p className="bd truncate" style={{
+                        fontSize: '13px', color: '#1A1A1A', margin: '1px 0 0 0', fontWeight: 700,
                       }}>
                         {prospect.company}
                       </p>
                     </div>
                   </div>
 
-                  {/* Email */}
-                  <p className="mn" style={{ fontSize: '11px', color: '#6B6B6B', margin: '0 0 8px 0' }}>
-                    {prospect.email}
-                  </p>
-
-                  {/* LinkedIn */}
-                  {prospect.linkedin_url && (
-                    <a
-                      href={prospect.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bd"
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '5px',
-                        fontSize: '11px', fontWeight: 600, color: '#0077B5',
-                        textDecoration: 'none', marginBottom: '12px',
-                        padding: '3px 8px', borderRadius: '6px',
-                        border: '1px solid rgba(0,119,181,.2)', background: 'rgba(0,119,181,.04)',
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/linkedin-icon.svg" alt="" width={12} height={12} />
-                      View on LinkedIn
-                    </a>
-                  )}
-
-                  {/* Score + meta */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  {/* Meta row: LinkedIn, Score, Industry, Size, Status */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                    {prospect.linkedin_url && (
+                      <a
+                        href={prospect.linkedin_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bd"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          fontSize: '10px', fontWeight: 600, color: '#0077B5',
+                          textDecoration: 'none',
+                          padding: '2px 7px', borderRadius: '5px',
+                          border: '1px solid rgba(0,119,181,.2)', background: 'rgba(0,119,181,.04)',
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/linkedin-icon.svg" alt="" width={10} height={10} />
+                        LinkedIn
+                      </a>
+                    )}
                     <div style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '6px',
-                      padding: '4px 12px', borderRadius: '20px',
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '2px 8px', borderRadius: '12px',
                       background: scoreBg(prospect.score),
                       border: `1px solid ${scoreColor(prospect.score)}20`,
                     }}>
                       <div style={{
-                        width: '8px', height: '8px', borderRadius: '50%',
+                        width: '6px', height: '6px', borderRadius: '50%',
                         background: scoreColor(prospect.score),
                       }} />
                       <span className="mn" style={{
-                        fontSize: '12px', fontWeight: 600,
+                        fontSize: '10px', fontWeight: 600,
                         color: scoreColor(prospect.score),
                       }}>{prospect.score}</span>
                     </div>
-                    <span className="bd" style={{ fontSize: '11px', color: '#A3A3A3', fontWeight: 500 }}>
+                    <span className="bd" style={{ fontSize: '10px', color: '#A3A3A3', fontWeight: 500 }}>
                       {prospect.industry}
                     </span>
-                    <span className="bd" style={{ fontSize: '11px', color: '#A3A3A3', fontWeight: 500 }}>
+                    <span className="bd" style={{ fontSize: '10px', color: '#A3A3A3', fontWeight: 500 }}>
                       {prospect.company_size}
                     </span>
                     {prospect.status !== 'new' && (
                       <span className="mn" style={{
-                        fontSize: '10px', fontWeight: 600, letterSpacing: '.04em',
-                        padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase',
+                        fontSize: '9px', fontWeight: 600, letterSpacing: '.04em',
+                        padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase',
                         background: prospect.status === 'approved' ? '#F0FDF4' : prospect.status === 'saved' ? '#F3F0FF' : '#F5F5F5',
                         color: prospect.status === 'approved' ? '#16A34A' : prospect.status === 'saved' ? '#7C3AED' : '#A3A3A3',
                         border: `1px solid ${prospect.status === 'approved' ? 'rgba(22,163,74,.15)' : prospect.status === 'saved' ? '#E9E5FF' : 'rgba(0,0,0,.06)'}`,
@@ -686,63 +727,105 @@ export default function ProspectsPage() {
                     )}
                   </div>
 
-                  {/* Match reasons */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <p className="bd" style={{
-                      fontSize: '11px', color: '#6B6B6B', fontWeight: 600,
-                      textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 6px 0',
-                    }}>
-                      Why this matches
-                    </p>
-                    {prospect.match_reasons?.map((reason, ri) => (
-                      <div key={ri} style={{ display: 'flex', gap: '6px', marginBottom: '3px' }}>
-                        <span style={{ color: '#7C3AED', fontSize: '10px', marginTop: '3px', flexShrink: 0 }}>&#x25CF;</span>
-                        <span className="bd" style={{ fontSize: '12px', color: '#57534E', lineHeight: 1.4 }}>{reason}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {/* Match reasons — show 2 by default */}
+                  {reasons.length > 0 && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <p className="bd" style={{
+                        fontSize: '10px', color: '#6B6B6B', fontWeight: 600,
+                        textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 4px 0',
+                      }}>
+                        Why this matches
+                      </p>
+                      {visibleReasons.map((reason, ri) => (
+                        <div key={ri} style={{ display: 'flex', gap: '5px', marginBottom: '2px' }}>
+                          <span style={{ color: '#7C3AED', fontSize: '8px', marginTop: '4px', flexShrink: 0 }}>&#x25CF;</span>
+                          <span className="bd line-clamp-2" style={{ fontSize: '11px', color: '#57534E', lineHeight: 1.35 }}>{reason}</span>
+                        </div>
+                      ))}
+                      {hasMoreReasons && (
+                        <button
+                          onClick={() => toggleExpanded(cardId)}
+                          className="bd"
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '10px', color: '#7C3AED', fontWeight: 600,
+                            padding: '2px 0 0 0',
+                          }}
+                        >
+                          {isExpanded ? 'Show less' : `+${reasons.length - 2} more`}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {/* More at this company */}
+                  {peers.length > 0 && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <p className="bd" style={{
+                        fontSize: '10px', color: '#A3A3A3', fontWeight: 600, margin: '0 0 4px 0',
+                      }}>
+                        More at {prospect.company}
+                      </p>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {peers.map(peer => (
+                          <span
+                            key={peer.id}
+                            className="bd"
+                            style={{
+                              fontSize: '10px', fontWeight: 500, color: '#6B6B6B',
+                              padding: '2px 8px', borderRadius: '6px',
+                              background: '#F5F3EE', border: '1px solid rgba(0,0,0,.06)',
+                            }}
+                          >
+                            {displayName(peer.name)} &middot; {peer.title}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions — single compact row */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
                     <button
                       className="action-btn bd"
                       onClick={() => updateStatus(prospect, 'approved')}
                       style={{
-                        padding: '7px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+                        padding: '5px 12px', borderRadius: '7px', fontSize: '11px', fontWeight: 600,
                         border: prospect.status === 'approved' ? '1.5px solid #16A34A' : '1.5px solid rgba(22,163,74,.3)',
                         background: prospect.status === 'approved' ? '#16A34A' : 'white',
                         color: prospect.status === 'approved' ? 'white' : '#16A34A',
                       }}
                     >
-                      {prospect.status === 'approved' ? 'Approved' : 'Approve'}
+                      {prospect.status === 'approved' ? '&#10003; Approved' : 'Approve'}
                     </button>
                     <button
                       className="action-btn bd"
                       onClick={() => updateStatus(prospect, 'skipped')}
                       style={{
-                        padding: '7px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+                        padding: '5px 12px', borderRadius: '7px', fontSize: '11px', fontWeight: 600,
                         border: '1.5px solid rgba(0,0,0,.1)',
                         background: prospect.status === 'skipped' ? '#E5E7EB' : 'white',
                         color: '#6B6B6B',
                       }}
                     >
-                      {prospect.status === 'skipped' ? 'Skipped' : 'Skip'}
+                      Skip
                     </button>
                     <button
                       className="action-btn bd"
                       onClick={() => updateStatus(prospect, 'saved')}
                       style={{
-                        padding: '7px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+                        padding: '5px 12px', borderRadius: '7px', fontSize: '11px', fontWeight: 600,
                         border: prospect.status === 'saved' ? '1.5px solid #7C3AED' : '1.5px solid rgba(124,58,237,.3)',
                         background: prospect.status === 'saved' ? '#7C3AED' : 'white',
                         color: prospect.status === 'saved' ? 'white' : '#7C3AED',
                       }}
                     >
-                      {prospect.status === 'saved' ? 'Saved' : 'Save for Later'}
+                      {prospect.status === 'saved' ? 'Saved' : 'Save'}
                     </button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* Infinite scroll sentinel */}
