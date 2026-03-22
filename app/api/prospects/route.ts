@@ -212,10 +212,12 @@ async function discoverViaGemini(
 
   const prompt = `Find 15 real companies that would buy this product: ${profile.product_name} — ${profile.product_description}. Industry: ${profile.target_industries}. Return ONLY a JSON array (no markdown, no backticks): [{"company_name":"...","website":"...","city":"...","state":"...","industry":"...","employee_count":"...","source":"gemini"}]`
 
-  // Retry once on 429
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Try models in order: gemini-2.0-flash, gemini-1.5-flash, gemini-pro
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro']
+
+  for (const model of models) {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,24 +231,30 @@ async function discoverViaGemini(
       }
     )
 
-    if (res.status === 429 && attempt === 0) {
-      console.warn('[Stage 1] Gemini: 429 rate limited, retrying in 2s...')
-      await new Promise(r => setTimeout(r, 2000))
+    if (res.status === 404) {
+      console.warn(`[Stage 1] Gemini: ${model} returned 404, trying next model...`)
+      continue
+    }
+
+    if (res.status === 429) {
+      console.warn(`[Stage 1] Gemini: ${model} rate limited (429), trying next model...`)
+      await new Promise(r => setTimeout(r, 1000))
       continue
     }
 
     if (!res.ok) {
-      console.warn(`[Stage 1] Gemini: HTTP ${res.status}`)
+      console.warn(`[Stage 1] Gemini: ${model} HTTP ${res.status}`)
       return []
     }
 
     const data = await res.json()
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
     const companies = extractJSON(text) as DiscoveredCompany[]
-    console.log(`[Stage 1] Gemini: ${companies.length} companies found`)
+    console.log(`[Stage 1] Gemini (${model}): ${companies.length} companies found`)
     return companies
   }
 
+  console.warn('[Stage 1] Gemini: all models failed')
   return []
 }
 
@@ -303,7 +311,7 @@ async function discoverFallback(
 ): Promise<DiscoveredCompany[]> {
   console.log('[Stage 1] All 3 LLMs returned empty — falling back to Claude (no web search)')
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 4000,
     messages: [{
       role: 'user',
@@ -337,7 +345,7 @@ async function mapDecisionMakers(
   ).join('\n')
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 4000,
     messages: [{
       role: 'user',
@@ -412,7 +420,7 @@ async function resolveContacts(
   try {
     const searchResult = await withTimeout(
       anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 8000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{
@@ -618,7 +626,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const uniqueCompanies = deduplicateCompanies(allCompanies).slice(0, 20)
+      // Prioritize by source quality: claude_web > perplexity > gemini > ai_fallback
+      const sourceRank: Record<string, number> = { claude_web: 0, perplexity: 1, gemini: 2, ai_fallback: 3 }
+      const uniqueCompanies = deduplicateCompanies(allCompanies)
+        .sort((a, b) => (sourceRank[a.source] ?? 9) - (sourceRank[b.source] ?? 9))
+        .slice(0, 10)
       console.log(`[Pipeline] Stage 1 complete: ${allCompanies.length} found, ${uniqueCompanies.length} unique`)
 
       if (uniqueCompanies.length === 0) {
