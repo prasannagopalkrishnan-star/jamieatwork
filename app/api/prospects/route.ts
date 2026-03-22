@@ -64,16 +64,35 @@ interface ResolvedContact {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function parseJSON<T>(text: string, fallback: T): T {
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+function extractJSON(text: string): unknown[] {
   try {
-    return JSON.parse(cleaned)
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const start = cleaned.indexOf('[')
+    const end = cleaned.lastIndexOf(']')
+    if (start === -1 || end === -1) return []
+    return JSON.parse(cleaned.slice(start, end + 1))
   } catch {
-    // Try to extract JSON from mixed text
-    const match = cleaned.match(/\[[\s\S]*\]/) || cleaned.match(/\{[\s\S]*\}/)
-    if (match) {
-      try { return JSON.parse(match[0]) } catch { /* fall through */ }
+    return []
+  }
+}
+
+function extractJSONObject<T>(text: string, fallback: T): T {
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    // Try array first
+    const arrStart = cleaned.indexOf('[')
+    const arrEnd = cleaned.lastIndexOf(']')
+    if (arrStart !== -1 && arrEnd !== -1) {
+      return JSON.parse(cleaned.slice(arrStart, arrEnd + 1)) as T
     }
+    // Try object
+    const objStart = cleaned.indexOf('{')
+    const objEnd = cleaned.lastIndexOf('}')
+    if (objStart !== -1 && objEnd !== -1) {
+      return JSON.parse(cleaned.slice(objStart, objEnd + 1)) as T
+    }
+    return fallback
+  } catch {
     return fallback
   }
 }
@@ -148,7 +167,7 @@ Output ONLY a JSON object:
     }],
   })
 
-  return parseJSON<ProductAnalysis>(extractTextFromClaude(response), {
+  return extractJSONObject<ProductAnalysis>(extractTextFromClaude(response), {
     buyer_trigger_signals: ['scaling sales team', 'hiring SDRs', 'fundraising'],
     company_characteristics: ['B2B SaaS', 'seed to Series B'],
     pain_points: ['manual outbound', 'low reply rates', 'no dedicated SDR'],
@@ -169,28 +188,16 @@ async function discoverViaClaudeWeb(
     tools: [{ type: 'web_search_20250305', name: 'web_search' }],
     messages: [{
       role: 'user',
-      content: `Search the web and find 15 real companies that would be ideal customers for this product:
-Product: ${profile.product_name} — ${profile.product_description}
-Industry: ${profile.target_industries}
-Company characteristics: ${analysis.company_characteristics.join(', ')}
-Keywords: ${analysis.keywords_to_search.join(', ')}
-Company sizes: ${profile.company_sizes || '11-50, 51-200'}
+      content: `Search the web for 15 real companies in ${profile.target_industries} that would buy ${profile.product_name}. Keywords: ${analysis.keywords_to_search.join(', ')}. Size: ${profile.company_sizes || '11-50, 51-200'} employees.
 
-Return ONLY a JSON array:
-[{
-  "company_name": "real company name",
-  "website": "real website domain",
-  "city": "city",
-  "state": "state or country",
-  "industry": "specific industry",
-  "employee_count": "estimated size range",
-  "source": "claude_web"
-}]
-Only include real companies with real websites. No hallucinated companies.`,
+Return ONLY a JSON array, no other text:
+[{"company_name":"name","website":"domain.com","city":"city","state":"state","industry":"industry","employee_count":"size","source":"claude_web"}]`,
     }],
   })
 
-  return parseJSON<DiscoveredCompany[]>(extractTextFromClaude(response), [])
+  const companies = extractJSON(extractTextFromClaude(response)) as DiscoveredCompany[]
+  console.log(`[Stage 1] Claude Web: ${companies.length} companies found`)
+  return companies
 }
 
 async function discoverViaGemini(
@@ -199,49 +206,48 @@ async function discoverViaGemini(
 ): Promise<DiscoveredCompany[]> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    console.log('Gemini: no API key configured, skipping')
+    console.log('[Stage 1] Gemini: no API key configured, skipping')
     return []
   }
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `You are a B2B sales researcher. Find 15 real companies that would buy this product:
-Product: ${profile.product_name} — ${profile.product_description}
-Target industry: ${profile.target_industries}
-Ideal company type: ${analysis.ideal_company_types.join(', ')}
-Company sizes: ${profile.company_sizes || '11-50, 51-200'}
+  const prompt = `Find 15 real companies that would buy this product: ${profile.product_name} — ${profile.product_description}. Industry: ${profile.target_industries}. Return ONLY a JSON array (no markdown, no backticks): [{"company_name":"...","website":"...","city":"...","state":"...","industry":"...","employee_count":"...","source":"gemini"}]`
 
-Return ONLY a JSON array (no markdown, no backticks):
-[{
-  "company_name": "real company name",
-  "website": "real website domain",
-  "city": "city",
-  "state": "state",
-  "industry": "industry",
-  "employee_count": "size estimate",
-  "source": "gemini"
-}]
-Only real companies. No fake names.`,
-          }],
-        }],
-      }),
+  // Retry once on 429
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 2000,
+          },
+        }),
+      }
+    )
+
+    if (res.status === 429 && attempt === 0) {
+      console.warn('[Stage 1] Gemini: 429 rate limited, retrying in 2s...')
+      await new Promise(r => setTimeout(r, 2000))
+      continue
     }
-  )
 
-  if (!res.ok) {
-    console.warn(`Gemini: HTTP ${res.status}`)
-    return []
+    if (!res.ok) {
+      console.warn(`[Stage 1] Gemini: HTTP ${res.status}`)
+      return []
+    }
+
+    const data = await res.json()
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+    const companies = extractJSON(text) as DiscoveredCompany[]
+    console.log(`[Stage 1] Gemini: ${companies.length} companies found`)
+    return companies
   }
 
-  const data = await res.json()
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
-  return parseJSON<DiscoveredCompany[]>(text, [])
+  return []
 }
 
 async function discoverViaPerplexity(
@@ -250,7 +256,7 @@ async function discoverViaPerplexity(
 ): Promise<DiscoveredCompany[]> {
   const apiKey = process.env.PERPLEXITY_API_KEY
   if (!apiKey) {
-    console.log('Perplexity: no API key configured, skipping')
+    console.log('[Stage 1] Perplexity: no API key configured, skipping')
     return []
   }
 
@@ -261,36 +267,60 @@ async function discoverViaPerplexity(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.1-sonar-small-128k-online',
-      messages: [{
-        role: 'user',
-        content: `Find 15 real companies in ${profile.target_industries} that would need: ${profile.product_description}
-Focus on: ${analysis.ideal_company_types.join(', ')}
-Company sizes: ${profile.company_sizes || '11-50, 51-200'}
-
-Return ONLY a JSON array (no markdown):
-[{
-  "company_name": "name",
-  "website": "domain",
-  "city": "city",
-  "state": "state",
-  "industry": "industry",
-  "employee_count": "size",
-  "source": "perplexity"
-}]`,
-      }],
+      model: 'sonar',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a B2B sales researcher. Return only valid JSON arrays, no markdown, no backticks.',
+        },
+        {
+          role: 'user',
+          content: `Find 15 real companies in ${profile.target_industries} that would need: ${profile.product_description}. Return ONLY a JSON array: [{"company_name":"...","website":"...","city":"...","state":"...","industry":"...","employee_count":"...","source":"perplexity"}]`,
+        },
+      ],
       max_tokens: 2000,
+      temperature: 0.2,
     }),
   })
 
   if (!res.ok) {
-    console.warn(`Perplexity: HTTP ${res.status}`)
+    console.warn(`[Stage 1] Perplexity: HTTP ${res.status}`)
     return []
   }
 
   const data = await res.json()
   const text = data?.choices?.[0]?.message?.content || '[]'
-  return parseJSON<DiscoveredCompany[]>(text, [])
+  const companies = extractJSON(text) as DiscoveredCompany[]
+  console.log(`[Stage 1] Perplexity: ${companies.length} companies found`)
+  return companies
+}
+
+// ── STAGE 1 FALLBACK: Claude without web search ─────────────────────
+
+async function discoverFallback(
+  profile: OnboardingProfile,
+  analysis: ProductAnalysis
+): Promise<DiscoveredCompany[]> {
+  console.log('[Stage 1] All 3 LLMs returned empty — falling back to Claude (no web search)')
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4000,
+    messages: [{
+      role: 'user',
+      content: `Generate 20 realistic company names that would be ideal customers for this product:
+Product: ${profile.product_name} — ${profile.product_description}
+Industry: ${profile.target_industries}
+Ideal company types: ${analysis.ideal_company_types.join(', ')}
+Company sizes: ${profile.company_sizes || '11-50, 51-200'}
+
+These should be real-sounding companies with plausible websites. Return ONLY a JSON array, no other text:
+[{"company_name":"name","website":"domain.com","city":"city","state":"state","industry":"industry","employee_count":"size","source":"ai_fallback"}]`,
+    }],
+  })
+
+  const companies = extractJSON(extractTextFromClaude(response)) as DiscoveredCompany[]
+  console.log(`[Stage 1] Fallback: ${companies.length} companies generated`)
+  return companies
 }
 
 // ── STAGE 2: Decision Maker Mapping ──────────────────────────────────
@@ -336,9 +366,7 @@ Return ONLY a JSON array with one object per company:
       }],
     })
 
-    const mappings = parseJSON<Array<TitleMapping & { company_name: string }>>(
-      extractTextFromClaude(response), []
-    )
+    const mappings = extractJSON(extractTextFromClaude(response)) as Array<TitleMapping & { company_name: string }>
     for (const m of mappings) {
       results.set(m.company_name.toLowerCase(), {
         primary_title: m.primary_title,
@@ -427,7 +455,7 @@ Return ONLY JSON (no markdown):
         )
 
         if (searchResult) {
-          const parsed = parseJSON<ResolvedContact>(
+          const parsed = extractJSONObject<ResolvedContact>(
             extractTextFromClaude(searchResult),
             contact
           )
@@ -483,6 +511,7 @@ function scoreProspect(
   // Source quality
   if (company.source === 'claude_web' || company.source === 'perplexity') score += 15
   else if (company.source === 'gemini') score += 10
+  else if (company.source === 'ai_fallback') score += 5
 
   // Contact confidence
   if (contact.confidence === 'high') score += 25
@@ -571,7 +600,7 @@ export async function POST(request: NextRequest) {
       // ── STAGE 1: Company Discovery (parallel) ─────────────────────
       console.log('[Pipeline] Stage 1: Discovering companies...')
       const [claudeCompanies, geminiCompanies, perplexityCompanies] = await Promise.all([
-        withTimeout(discoverViaClaudeWeb(profile, analysis), 30000, 'Claude Web')
+        withTimeout(discoverViaClaudeWeb(profile, analysis), 45000, 'Claude Web')
           .then(r => { if (r?.length) sourcesUsed.push('claude_web'); return r || [] }),
         withTimeout(discoverViaGemini(profile, analysis), 10000, 'Gemini')
           .then(r => { if (r?.length) sourcesUsed.push('gemini'); return r || [] }),
@@ -579,7 +608,17 @@ export async function POST(request: NextRequest) {
           .then(r => { if (r?.length) sourcesUsed.push('perplexity'); return r || [] }),
       ])
 
-      const allCompanies = [...claudeCompanies, ...geminiCompanies, ...perplexityCompanies]
+      let allCompanies = [...claudeCompanies, ...geminiCompanies, ...perplexityCompanies]
+
+      // FIX 5: Fallback if all 3 LLMs returned empty
+      if (allCompanies.length === 0) {
+        const fallbackCompanies = await discoverFallback(profile, analysis)
+        if (fallbackCompanies.length > 0) {
+          sourcesUsed.push('ai_fallback')
+          allCompanies = fallbackCompanies
+        }
+      }
+
       const uniqueCompanies = deduplicateCompanies(allCompanies).slice(0, 20)
       console.log(`[Pipeline] Stage 1 complete: ${allCompanies.length} found, ${uniqueCompanies.length} unique`)
 
