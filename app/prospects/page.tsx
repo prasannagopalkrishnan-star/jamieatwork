@@ -212,12 +212,14 @@ export default function ProspectsPage() {
         setError(data.error)
         return
       }
-      if (data.prospects?.length > 0) {
+      if (data.success && data.prospects_saved > 0) {
         // Reload from DB to get proper IDs and status
         await loadProspects(userId, 0, true)
         await loadFilters(userId)
+      } else if (data.prospects_saved === 0 && data.skipped > 0) {
+        setError(`All ${data.skipped} prospects were duplicates or below quality threshold. Try broadening your ICP.`)
       } else {
-        setError('No prospects were generated. Please try again.')
+        setError(data.error || 'No prospects were generated. Please try again.')
       }
     } catch (err) {
       console.error('Failed to generate prospects:', err)
@@ -410,7 +412,7 @@ export default function ProspectsPage() {
               opacity: loading ? 0.8 : 1,
             }}
           >
-            {loading ? 'Generating...' : prospects.length > 0 ? 'Generate More' : 'Generate Prospects'}
+            {loading ? 'Researching prospects...' : prospects.length > 0 ? 'Generate More' : 'Generate Prospects'}
           </button>
         </div>
 

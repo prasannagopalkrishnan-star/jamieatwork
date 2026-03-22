@@ -17,6 +17,510 @@ const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY)
   : supabase
 
+// ── Types ───────────────────────────────────────────────────────────
+
+interface OnboardingProfile {
+  product_name: string
+  product_description: string
+  problem_solved: string
+  target_industries: string
+  target_titles: string
+  company_sizes: string
+  geographies: string
+}
+
+interface ProductAnalysis {
+  buyer_trigger_signals: string[]
+  company_characteristics: string[]
+  pain_points: string[]
+  ideal_company_types: string[]
+  keywords_to_search: string[]
+}
+
+interface DiscoveredCompany {
+  company_name: string
+  website: string
+  city: string
+  state: string
+  industry: string
+  employee_count: string
+  source: string
+}
+
+interface TitleMapping {
+  primary_title: string
+  secondary_title: string
+  reasoning: string
+}
+
+interface ResolvedContact {
+  name: string | null
+  email: string | null
+  phone: string | null
+  linkedin_url: string | null
+  confidence: 'high' | 'medium' | 'low'
+  source: string
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+function parseJSON<T>(text: string, fallback: T): T {
+  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    // Try to extract JSON from mixed text
+    const match = cleaned.match(/\[[\s\S]*\]/) || cleaned.match(/\{[\s\S]*\}/)
+    if (match) {
+      try { return JSON.parse(match[0]) } catch { /* fall through */ }
+    }
+    return fallback
+  }
+}
+
+function extractTextFromClaude(response: Anthropic.Message): string {
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map(b => b.text)
+    .join('\n')
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => {
+      setTimeout(() => {
+        console.warn(`${label} timed out after ${ms}ms`)
+        resolve(null)
+      }, ms)
+    }),
+  ])
+}
+
+function inferEmail(name: string, domain: string): { email: string; inferred: boolean } {
+  const parts = name.toLowerCase().split(/\s+/)
+  if (parts.length >= 2) {
+    return { email: `${parts[0]}.${parts[parts.length - 1]}@${domain}`, inferred: true }
+  }
+  return { email: `${parts[0]}@${domain}`, inferred: true }
+}
+
+function domainFromWebsite(website: string): string {
+  return website.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').toLowerCase()
+}
+
+function deduplicateCompanies(companies: DiscoveredCompany[]): DiscoveredCompany[] {
+  const seen = new Map<string, DiscoveredCompany>()
+  for (const c of companies) {
+    const key = c.company_name.toLowerCase().trim()
+    if (!key || !c.website) continue
+    if (!seen.has(key)) {
+      seen.set(key, c)
+    }
+  }
+  return Array.from(seen.values())
+}
+
+// ── STAGE 0: Product Analysis ────────────────────────────────────────
+
+async function analyzeProduct(profile: OnboardingProfile): Promise<ProductAnalysis> {
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1500,
+    messages: [{
+      role: 'user',
+      content: `You are analyzing a B2B startup's product to identify ideal prospects.
+
+Product: ${profile.product_name}
+Description: ${profile.product_description}
+Problem solved: ${profile.problem_solved}
+Target industries: ${profile.target_industries}
+Target titles: ${profile.target_titles}
+
+Output ONLY a JSON object:
+{
+  "buyer_trigger_signals": ["signal1", "signal2", "signal3"],
+  "company_characteristics": ["characteristic1", "characteristic2"],
+  "pain_points": ["pain1", "pain2", "pain3"],
+  "ideal_company_types": ["type1", "type2", "type3"],
+  "keywords_to_search": ["keyword1", "keyword2", "keyword3"]
+}`,
+    }],
+  })
+
+  return parseJSON<ProductAnalysis>(extractTextFromClaude(response), {
+    buyer_trigger_signals: ['scaling sales team', 'hiring SDRs', 'fundraising'],
+    company_characteristics: ['B2B SaaS', 'seed to Series B'],
+    pain_points: ['manual outbound', 'low reply rates', 'no dedicated SDR'],
+    ideal_company_types: ['early-stage SaaS', 'B2B startups'],
+    keywords_to_search: [profile.target_industries || 'SaaS startups', profile.product_name],
+  })
+}
+
+// ── STAGE 1: Company Discovery ───────────────────────────────────────
+
+async function discoverViaClaudeWeb(
+  profile: OnboardingProfile,
+  analysis: ProductAnalysis
+): Promise<DiscoveredCompany[]> {
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4000,
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+    messages: [{
+      role: 'user',
+      content: `Search the web and find 15 real companies that would be ideal customers for this product:
+Product: ${profile.product_name} — ${profile.product_description}
+Industry: ${profile.target_industries}
+Company characteristics: ${analysis.company_characteristics.join(', ')}
+Keywords: ${analysis.keywords_to_search.join(', ')}
+Company sizes: ${profile.company_sizes || '11-50, 51-200'}
+
+Return ONLY a JSON array:
+[{
+  "company_name": "real company name",
+  "website": "real website domain",
+  "city": "city",
+  "state": "state or country",
+  "industry": "specific industry",
+  "employee_count": "estimated size range",
+  "source": "claude_web"
+}]
+Only include real companies with real websites. No hallucinated companies.`,
+    }],
+  })
+
+  return parseJSON<DiscoveredCompany[]>(extractTextFromClaude(response), [])
+}
+
+async function discoverViaGemini(
+  profile: OnboardingProfile,
+  analysis: ProductAnalysis
+): Promise<DiscoveredCompany[]> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    console.log('Gemini: no API key configured, skipping')
+    return []
+  }
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `You are a B2B sales researcher. Find 15 real companies that would buy this product:
+Product: ${profile.product_name} — ${profile.product_description}
+Target industry: ${profile.target_industries}
+Ideal company type: ${analysis.ideal_company_types.join(', ')}
+Company sizes: ${profile.company_sizes || '11-50, 51-200'}
+
+Return ONLY a JSON array (no markdown, no backticks):
+[{
+  "company_name": "real company name",
+  "website": "real website domain",
+  "city": "city",
+  "state": "state",
+  "industry": "industry",
+  "employee_count": "size estimate",
+  "source": "gemini"
+}]
+Only real companies. No fake names.`,
+          }],
+        }],
+      }),
+    }
+  )
+
+  if (!res.ok) {
+    console.warn(`Gemini: HTTP ${res.status}`)
+    return []
+  }
+
+  const data = await res.json()
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+  return parseJSON<DiscoveredCompany[]>(text, [])
+}
+
+async function discoverViaPerplexity(
+  profile: OnboardingProfile,
+  analysis: ProductAnalysis
+): Promise<DiscoveredCompany[]> {
+  const apiKey = process.env.PERPLEXITY_API_KEY
+  if (!apiKey) {
+    console.log('Perplexity: no API key configured, skipping')
+    return []
+  }
+
+  const res = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-sonar-small-128k-online',
+      messages: [{
+        role: 'user',
+        content: `Find 15 real companies in ${profile.target_industries} that would need: ${profile.product_description}
+Focus on: ${analysis.ideal_company_types.join(', ')}
+Company sizes: ${profile.company_sizes || '11-50, 51-200'}
+
+Return ONLY a JSON array (no markdown):
+[{
+  "company_name": "name",
+  "website": "domain",
+  "city": "city",
+  "state": "state",
+  "industry": "industry",
+  "employee_count": "size",
+  "source": "perplexity"
+}]`,
+      }],
+      max_tokens: 2000,
+    }),
+  })
+
+  if (!res.ok) {
+    console.warn(`Perplexity: HTTP ${res.status}`)
+    return []
+  }
+
+  const data = await res.json()
+  const text = data?.choices?.[0]?.message?.content || '[]'
+  return parseJSON<DiscoveredCompany[]>(text, [])
+}
+
+// ── STAGE 2: Decision Maker Mapping ──────────────────────────────────
+
+async function mapDecisionMakers(
+  companies: DiscoveredCompany[],
+  profile: OnboardingProfile
+): Promise<Map<string, TitleMapping>> {
+  const results = new Map<string, TitleMapping>()
+
+  // Batch companies into groups of 5 for efficiency
+  const batches: DiscoveredCompany[][] = []
+  for (let i = 0; i < companies.length; i += 5) {
+    batches.push(companies.slice(i, i + 5))
+  }
+
+  await Promise.all(batches.map(async (batch) => {
+    const companySummaries = batch.map((c, i) =>
+      `${i + 1}. ${c.company_name} (${c.industry}, ~${c.employee_count} employees)`
+    ).join('\n')
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: `For each company below, determine who would be the best buyer for this product:
+Product: ${profile.product_name} — ${profile.product_description}
+Suggested target titles: ${profile.target_titles || 'CEO, VP Sales, Head of Growth'}
+
+Companies:
+${companySummaries}
+
+Consider company size — small companies (<50) have C-suite buyers, large companies (200+) have VP/Director buyers.
+
+Return ONLY a JSON array with one object per company:
+[{
+  "company_name": "exact company name",
+  "primary_title": "exact title",
+  "secondary_title": "backup title",
+  "reasoning": "one sentence why"
+}]`,
+      }],
+    })
+
+    const mappings = parseJSON<Array<TitleMapping & { company_name: string }>>(
+      extractTextFromClaude(response), []
+    )
+    for (const m of mappings) {
+      results.set(m.company_name.toLowerCase(), {
+        primary_title: m.primary_title,
+        secondary_title: m.secondary_title,
+        reasoning: m.reasoning,
+      })
+    }
+  }))
+
+  return results
+}
+
+// ── STAGE 3: Contact Resolution ──────────────────────────────────────
+
+async function resolveContacts(
+  companies: DiscoveredCompany[],
+  titleMap: Map<string, TitleMapping>,
+  profile: OnboardingProfile,
+  analysis: ProductAnalysis
+): Promise<Array<{
+  company: DiscoveredCompany
+  title: TitleMapping
+  contact: ResolvedContact
+  pain_points: string[]
+  match_reasons: string[]
+  talking_points: string[]
+}>> {
+  // Process in batches of 5 for parallelism without overwhelming APIs
+  const results: Array<{
+    company: DiscoveredCompany
+    title: TitleMapping
+    contact: ResolvedContact
+    pain_points: string[]
+    match_reasons: string[]
+    talking_points: string[]
+  }> = []
+
+  const batches: DiscoveredCompany[][] = []
+  for (let i = 0; i < companies.length; i += 5) {
+    batches.push(companies.slice(i, i + 5))
+  }
+
+  for (const batch of batches) {
+    const batchResults = await Promise.all(batch.map(async (company) => {
+      const titleMapping = titleMap.get(company.company_name.toLowerCase()) || {
+        primary_title: profile.target_titles?.split(',')[0]?.trim() || 'CEO',
+        secondary_title: 'Head of Growth',
+        reasoning: 'Default mapping',
+      }
+
+      // Step A: Web search for real person
+      let contact: ResolvedContact = {
+        name: null,
+        email: null,
+        phone: null,
+        linkedin_url: null,
+        confidence: 'low',
+        source: 'inferred',
+      }
+
+      try {
+        const searchResult = await withTimeout(
+          anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1500,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            messages: [{
+              role: 'user',
+              content: `Search for the ${titleMapping.primary_title} at ${company.company_name} (${company.website}).
+Find their full name, LinkedIn profile URL, and email if publicly available.
+If you can't find the ${titleMapping.primary_title}, try ${titleMapping.secondary_title}.
+
+Return ONLY JSON (no markdown):
+{
+  "name": "full name or null",
+  "email": "email or null",
+  "phone": "phone or null",
+  "linkedin_url": "direct LinkedIn profile URL or null",
+  "confidence": "high/medium/low",
+  "source": "where you found this"
+}`,
+            }],
+          }),
+          10000,
+          `Contact search: ${company.company_name}`
+        )
+
+        if (searchResult) {
+          const parsed = parseJSON<ResolvedContact>(
+            extractTextFromClaude(searchResult),
+            contact
+          )
+          contact = { ...contact, ...parsed }
+        }
+      } catch (err) {
+        console.warn(`Contact search failed for ${company.company_name}:`, err)
+      }
+
+      // Step B: LinkedIn search URL fallback
+      if (!contact.linkedin_url && contact.name) {
+        contact.linkedin_url = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.name + ' ' + company.company_name)}`
+      } else if (!contact.linkedin_url) {
+        contact.linkedin_url = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(titleMapping.primary_title + ' ' + company.company_name)}`
+      }
+
+      // Step C: Email pattern inference
+      if (!contact.email && contact.name) {
+        const domain = domainFromWebsite(company.website)
+        const { email } = inferEmail(contact.name, domain)
+        contact.email = email
+      }
+
+      // Generate pain points and match reasons specific to this prospect
+      const pain_points = analysis.pain_points.slice(0, 3)
+      const match_reasons = [
+        `${company.company_name} operates in ${company.industry} — direct ICP match for ${profile.product_name}`,
+        `${titleMapping.primary_title} at a ${company.employee_count}-person company is the ideal buyer`,
+        titleMapping.reasoning,
+      ]
+      const talking_points = [
+        `Reference their ${company.industry} focus and how ${profile.product_name} solves ${analysis.pain_points[0] || 'their key challenge'}`,
+        `Mention companies similar to ${company.company_name} that benefit from ${profile.product_name}`,
+      ]
+
+      return { company, title: titleMapping, contact, pain_points, match_reasons, talking_points }
+    }))
+
+    results.push(...batchResults)
+  }
+
+  return results
+}
+
+// ── STAGE 4: Score + Save ────────────────────────────────────────────
+
+function scoreProspect(
+  company: DiscoveredCompany,
+  contact: ResolvedContact
+): number {
+  let score = 50 // base
+
+  // Source quality
+  if (company.source === 'claude_web' || company.source === 'perplexity') score += 15
+  else if (company.source === 'gemini') score += 10
+
+  // Contact confidence
+  if (contact.confidence === 'high') score += 25
+  else if (contact.confidence === 'medium') score += 15
+  else score += 5
+
+  // Has real name
+  if (contact.name) score += 5
+
+  // Has linkedin URL (not just search)
+  if (contact.linkedin_url?.includes('/in/')) score += 5
+
+  // Cap at 100
+  return Math.min(score, 100)
+}
+
+// ── Load onboarding profile ──────────────────────────────────────────
+
+async function loadProfile(userId: string): Promise<OnboardingProfile | null> {
+  try {
+    const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(userId)
+    const od = authUser?.user_metadata?.onboarding_data as Record<string, unknown> | undefined
+    if (!od) return null
+
+    return {
+      product_name: (od.product_name as string) || '',
+      product_description: (od.product_description as string) || '',
+      problem_solved: (od.problem_solved as string) || '',
+      target_industries: (od.target_industries as string[])?.join(', ') || '',
+      target_titles: (od.target_titles as string[])?.join(', ') || '',
+      company_sizes: (od.company_sizes as string[])?.join(', ') || '',
+      geographies: (od.geographies as string[])?.join(', ') || '',
+    }
+  } catch {
+    return null
+  }
+}
+
 // ── Main handler ─────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -28,116 +532,129 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required field: action' }, { status: 400 })
     }
 
-    // ── Generate prospects from ICP ──────────────────────────────────
+    // ── Generate prospects — 4-stage pipeline ─────────────────────────
     if (action === 'generate') {
       const { user_id, icp: providedIcp } = body
 
-      // Try to load ICP from Supabase onboarding_data if not provided
-      let icp = providedIcp || { industries: '', company_size: '', roles: '', geography: '' }
+      if (!user_id) {
+        return NextResponse.json({ error: 'Missing user_id' }, { status: 400 })
+      }
 
-      if (user_id && (!providedIcp || !providedIcp.industries)) {
-        try {
-          const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(user_id)
-          const od = authUser?.user_metadata?.onboarding_data as Record<string, unknown> | undefined
+      // Load onboarding profile
+      let profile: OnboardingProfile
+      const loaded = await loadProfile(user_id)
 
-          if (od) {
-            icp = {
-              industries: (od.target_industries as string[])?.join(', ') || icp.industries,
-              company_size: (od.company_sizes as string[])?.join(', ') || icp.company_size,
-              roles: (od.target_titles as string[])?.join(', ') || icp.roles,
-              geography: (od.geographies as string[])?.join(', ') || icp.geography,
-              product_name: (od.product_name as string) || '',
-              product_description: (od.product_description as string) || '',
-              problem_solved: (od.problem_solved as string) || '',
-            }
-          }
-        } catch {
-          // admin API not available — use ICP from request body
+      if (loaded && loaded.product_name) {
+        profile = loaded
+      } else if (providedIcp) {
+        profile = {
+          product_name: providedIcp.product_name || 'Our Product',
+          product_description: providedIcp.product_description || '',
+          problem_solved: providedIcp.problem_solved || '',
+          target_industries: providedIcp.industries || 'SaaS, Technology',
+          target_titles: providedIcp.roles || 'CEO, VP of Sales, Head of Growth',
+          company_sizes: providedIcp.company_size || '11-50',
+          geographies: providedIcp.geography || 'United States',
         }
+      } else {
+        return NextResponse.json({ error: 'No onboarding profile found. Complete onboarding first.' }, { status: 400 })
       }
 
-      const { industries, company_size, roles, geography, product_name, product_description, problem_solved } = icp
+      const sourcesUsed: string[] = []
+      let skipped = 0
 
-      const productContext = product_name
-        ? `\nProduct being sold (use this to make match_reasons and pain_points specific):
-- Product: ${product_name}
-- Description: ${product_description || 'N/A'}
-- Problem solved: ${problem_solved || 'N/A'}`
-        : ''
+      // ── STAGE 0: Product Analysis ─────────────────────────────────
+      console.log('[Pipeline] Stage 0: Analyzing product...')
+      const analysis = await analyzeProduct(profile)
+      console.log('[Pipeline] Stage 0 complete:', analysis.keywords_to_search)
 
-      const targetTitles = roles || 'CEO, VP of Sales, CRO, Head of Growth, Founder'
+      // ── STAGE 1: Company Discovery (parallel) ─────────────────────
+      console.log('[Pipeline] Stage 1: Discovering companies...')
+      const [claudeCompanies, geminiCompanies, perplexityCompanies] = await Promise.all([
+        withTimeout(discoverViaClaudeWeb(profile, analysis), 30000, 'Claude Web')
+          .then(r => { if (r?.length) sourcesUsed.push('claude_web'); return r || [] }),
+        withTimeout(discoverViaGemini(profile, analysis), 10000, 'Gemini')
+          .then(r => { if (r?.length) sourcesUsed.push('gemini'); return r || [] }),
+        withTimeout(discoverViaPerplexity(profile, analysis), 10000, 'Perplexity')
+          .then(r => { if (r?.length) sourcesUsed.push('perplexity'); return r || [] }),
+      ])
 
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 5000,
-        system: `You are a B2B sales research assistant. Generate exactly 10 realistic prospect profiles based on the given ICP (Ideal Customer Profile). Each prospect should be a senior decision-maker at a fictional but realistic company.
-${productContext}
+      const allCompanies = [...claudeCompanies, ...geminiCompanies, ...perplexityCompanies]
+      const uniqueCompanies = deduplicateCompanies(allCompanies).slice(0, 20)
+      console.log(`[Pipeline] Stage 1 complete: ${allCompanies.length} found, ${uniqueCompanies.length} unique`)
 
-Return ONLY a valid JSON array (no backticks, no markdown). Each object must have:
-{
-  "name": "Full Name",
-  "title": "Senior decision-maker title (VP, Director, C-suite, Founder, Head of)",
-  "company": "Realistic fictional company name",
-  "email": "firstname.lastname@companydomain.com",
-  "linkedin_url": "https://www.linkedin.com/search/results/people/?keywords=FirstName%20LastName%20CompanyName",
-  "score": number 1-100,
-  "reasoning": "One sentence on why they are a good ICP match",
-  "match_reasons": ["specific reason 1", "specific reason 2", "specific reason 3"],
-  "pain_points": ["pain point 1", "pain point 2"],
-  "industry": "specific industry name",
-  "company_size": "employee range",
-  "location": "City, State"
-}
-
-RULES:
-- Titles MUST be senior decision-makers only: VP, Director, C-suite, Founder, Head of, Partner. Never junior titles.
-- Names must be diverse — mix of ethnicities, genders, and backgrounds
-- Company names MUST be creative and varied — use natural-sounding startup names like Loom, Notion, Vanta, Datadog, Figma. Never use "[Industry]Tech" patterns. Each name must feel unique and real.
-- linkedin_url MUST be a LinkedIn people search URL: https://www.linkedin.com/search/results/people/?keywords=FirstName%20LastName%20CompanyName (URL-encode spaces as %20). This lets the user find real people matching the profile.
-- Email domains must match the company name (lowercase, no spaces, e.g. acme.com, vantahealth.com)
-- Scores should vary: 2-3 strong (80-95), 4-5 medium (50-79), 2-3 weaker (30-49)
-- match_reasons MUST be specific and actionable — reference the exact product, pain point, or problem. Never use generic filler like "growing company" or "scaling challenges."
-- pain_points must be specific to the prospect's role and industry — what keeps them up at night that the product solves
-- company_size values MUST use standard ranges: 1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000. High-scoring prospects should match the target sizes exactly.
-- location must be a real US city and state (e.g. "Austin, TX", "San Francisco, CA")`,
-        messages: [{
-          role: 'user',
-          content: `Generate 10 sales prospects for this ICP:
-- Target Industries: ${industries || 'SaaS, Technology'}
-- Company Size: ${company_size || '11-50 employees'}
-- Target Titles (decision makers): ${targetTitles}
-- Geography: ${geography || 'United States'}
-
-Return the JSON array now.`,
-        }],
-      })
-
-      const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
-      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-
-      let prospects: Record<string, unknown>[]
-      try {
-        prospects = JSON.parse(cleaned)
-      } catch {
-        return NextResponse.json({ prospects: [], error: 'Could not parse prospect data' }, { status: 500 })
+      if (uniqueCompanies.length === 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'No companies discovered. Try broadening your ICP.',
+          prospects_generated: 0,
+          prospects_saved: 0,
+          sources_used: sourcesUsed,
+          skipped: 0,
+        })
       }
 
-      // Save to Supabase
-      if (user_id && prospects.length > 0) {
-        const rows = prospects.map((p: Record<string, unknown>) => ({
+      // ── STAGE 2: Decision Maker Mapping ───────────────────────────
+      console.log('[Pipeline] Stage 2: Mapping decision makers...')
+      const titleMap = await mapDecisionMakers(uniqueCompanies, profile)
+      console.log(`[Pipeline] Stage 2 complete: ${titleMap.size} titles mapped`)
+
+      // ── STAGE 3: Contact Resolution ───────────────────────────────
+      console.log('[Pipeline] Stage 3: Resolving contacts...')
+      const prospects = await resolveContacts(uniqueCompanies, titleMap, profile, analysis)
+      console.log(`[Pipeline] Stage 3 complete: ${prospects.length} contacts resolved`)
+
+      // ── STAGE 4: Score + Dedup + Save ─────────────────────────────
+      console.log('[Pipeline] Stage 4: Scoring and saving...')
+      const rows: Record<string, unknown>[] = []
+
+      for (const p of prospects) {
+        const score = scoreProspect(p.company, p.contact)
+
+        // Skip below threshold
+        if (score < 50) {
+          skipped++
+          continue
+        }
+
+        // Check for existing duplicate
+        const { data: existing } = await supabaseAdmin
+          .from('prospects')
+          .select('id')
+          .eq('user_id', user_id)
+          .ilike('company', p.company.company_name)
+          .maybeSingle()
+
+        if (existing) {
+          skipped++
+          continue
+        }
+
+        rows.push({
           user_id,
-          name: p.name,
-          title: p.title,
-          company: p.company,
-          email: p.email || '',
-          linkedin_url: p.linkedin_url || '',
-          score: p.score,
+          name: p.contact.name || `${p.title.primary_title} at ${p.company.company_name}`,
+          title: p.title.primary_title,
+          company: p.company.company_name,
+          industry: p.company.industry,
+          company_size: p.company.employee_count,
+          email: p.contact.email || '',
+          phone: p.contact.phone || '',
+          linkedin_url: p.contact.linkedin_url || '',
+          score,
+          reasoning: p.title.reasoning,
           match_reasons: p.match_reasons,
-          industry: p.industry,
-          company_size: p.company_size,
+          pain_points: p.pain_points,
+          talking_points: p.talking_points,
+          source: p.company.source,
+          company_verified: p.company.source === 'claude_web' || p.company.source === 'perplexity',
+          contact_inferred: p.contact.confidence !== 'high',
+          confidence: p.contact.confidence,
           status: 'new',
-        }))
+        })
+      }
 
+      let savedCount = 0
+      if (rows.length > 0) {
         const { data: saved, error } = await supabaseAdmin
           .from('prospects')
           .insert(rows)
@@ -145,13 +662,46 @@ Return the JSON array now.`,
 
         if (error) {
           console.error('Supabase insert error:', error)
-          return NextResponse.json({ prospects, saved: false })
-        }
+          // Try inserting without new columns in case migration hasn't run
+          const fallbackRows = rows.map(r => ({
+            user_id: r.user_id,
+            name: r.name,
+            title: r.title,
+            company: r.company,
+            industry: r.industry,
+            company_size: r.company_size,
+            email: r.email,
+            linkedin_url: r.linkedin_url,
+            score: r.score,
+            reasoning: r.reasoning,
+            match_reasons: r.match_reasons,
+            status: 'new',
+          }))
 
-        return NextResponse.json({ prospects: saved, saved: true })
+          const { data: fallbackSaved, error: fallbackError } = await supabaseAdmin
+            .from('prospects')
+            .insert(fallbackRows)
+            .select()
+
+          if (fallbackError) {
+            console.error('Fallback insert also failed:', fallbackError)
+          } else {
+            savedCount = fallbackSaved?.length || 0
+          }
+        } else {
+          savedCount = saved?.length || 0
+        }
       }
 
-      return NextResponse.json({ prospects, saved: false })
+      console.log(`[Pipeline] Stage 4 complete: ${savedCount} saved, ${skipped} skipped`)
+
+      return NextResponse.json({
+        success: true,
+        prospects_generated: prospects.length,
+        prospects_saved: savedCount,
+        sources_used: sourcesUsed,
+        skipped,
+      })
     }
 
     // ── List prospects with pagination + filters ─────────────────────
