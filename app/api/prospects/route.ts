@@ -78,13 +78,13 @@ interface ApolloPersonResult {
 async function searchApollo(icp: Record<string, string>): Promise<ApolloPersonResult[]> {
   if (!process.env.APOLLO_API_KEY) return []
 
-  const res = await fetch('https://api.apollo.io/v1/mixed_people/search', {
+  const res = await fetch('https://api.apollo.io/api/v1/mixed_people/search', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Api-Key': process.env.APOLLO_API_KEY,
     },
     body: JSON.stringify({
+      api_key: process.env.APOLLO_API_KEY,
       person_titles: buildApolloTitles(icp.roles),
       person_locations: buildApolloLocations(icp.geography),
       organization_num_employees_ranges: buildApolloEmployeeRanges(icp.company_size),
