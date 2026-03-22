@@ -47,17 +47,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  const onboardingCompleted = user?.user_metadata?.onboarding_completed === true
+
+  // Onboarding gate — redirect completed users away from /onboarding to /dashboard
+  if (request.nextUrl.pathname.startsWith('/onboarding') && user && onboardingCompleted) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
   // Dashboard gate — redirect to onboarding if not completed
   const dashboardPaths = ['/dashboard', '/prospects', '/outreach', '/inbox']
   const isDashboardPage = dashboardPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
-  if (isDashboardPage && user) {
-    const onboardingCompleted = user.user_metadata?.onboarding_completed === true
-    if (!onboardingCompleted) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/onboarding'
-      return NextResponse.redirect(url)
-    }
+  if (isDashboardPage && user && !onboardingCompleted) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/onboarding'
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

@@ -173,11 +173,14 @@ export default function OnboardingPage() {
   }
 
   // ─── Step 5: Save & Certify ───
+  const [saveError, setSaveError] = useState('')
+
   const certifyAndDeploy = async () => {
     setSaving(true)
+    setSaveError('')
     try {
       const supabase = createClient()
-      await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         data: {
           onboarding_data: {
             product_name: form.product_name,
@@ -194,13 +197,23 @@ export default function OnboardingPage() {
             disqualifiers: form.disqualifiers,
             competitor_names: form.competitor_names,
             deal_size_min: form.deal_size_min,
+            website: form.website,
             certified_at: new Date().toISOString(),
           },
           onboarding_completed: true,
         },
       })
-    } catch {
-      // continue to celebration even if save fails
+      if (error) {
+        console.error('Failed to save onboarding profile:', error)
+        setSaveError('Failed to save your profile. Please try again.')
+        setSaving(false)
+        return
+      }
+    } catch (err) {
+      console.error('Failed to save onboarding profile:', err)
+      setSaveError('Failed to save your profile. Please try again.')
+      setSaving(false)
+      return
     }
     setCertified(true)
     setSaving(false)
@@ -979,6 +992,11 @@ export default function OnboardingPage() {
           </p>
         </div>
 
+        {saveError && (
+          <p style={{ color: '#DC2626', fontSize: 14, fontWeight: 600, marginBottom: 12, textAlign: 'center' }}>
+            {saveError}
+          </p>
+        )}
         <button
           onClick={certifyAndDeploy}
           disabled={saving}
@@ -992,7 +1010,7 @@ export default function OnboardingPage() {
             cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
-          {saving ? 'Saving...' : 'Approve & Deploy Jamie'}
+          {saving ? 'Saving...' : saveError ? 'Retry — Deploy Jamie' : 'Approve & Deploy Jamie'}
         </button>
       </div>
     )
