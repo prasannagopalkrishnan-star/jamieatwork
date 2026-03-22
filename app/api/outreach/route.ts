@@ -1,9 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
+
+const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null
+
+interface OnboardingProfile {
+  product_name: string
+  product_description: string
+  problem_solved: string
+  key_differentiators: string
+  voice_style: string
+  target_industries: string[]
+  company_sizes: string[]
+  target_titles: string[]
+  geographies: string[]
+}
+
+async function fetchOnboardingProfile(userId: string): Promise<OnboardingProfile | null> {
+  if (!supabaseAdmin || !userId) return null
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId)
+    const od = user?.user_metadata?.onboarding_data
+    if (od) return od as OnboardingProfile
+  } catch {
+    // admin API unavailable
+  }
+  return null
+}
+
+function buildProductBlock(profile: OnboardingProfile | null, fallbackInfo?: Record<string, string> | null): string {
+  const p = profile
+  if (p?.product_name) {
+    return `Product context (THIS is what you are selling — NOT Jamie or any AI SDR platform):
+- Company/Product: ${p.product_name}
+- Description: ${p.product_description || 'N/A'}
+- Problem solved: ${p.problem_solved || 'N/A'}
+- Differentiators: ${p.key_differentiators || 'N/A'}
+- Target industries: ${p.target_industries?.join(', ') || 'N/A'}
+- Target roles: ${p.target_titles?.join(', ') || 'N/A'}`
+  }
+  if (fallbackInfo?.product_name) {
+    return `Product context (THIS is what you are selling — NOT Jamie or any AI SDR platform):
+- Company/Product: ${fallbackInfo.product_name}
+- Description: ${fallbackInfo.product_description || 'N/A'}
+- Problem solved: ${fallbackInfo.problem_solved || 'N/A'}
+- Differentiators: ${fallbackInfo.key_differentiators || 'N/A'}`
+  }
+  return 'No product info available — ask the prospect about their challenges and offer to share more about the product on a call.'
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,25 +66,26 @@ export async function POST(request: NextRequest) {
 
     // ACTION: Generate a 4-step outreach sequence
     if (action === 'generate_sequence') {
-      const { prospect, voice_style, cta, product_info } = body
+      const { prospect, voice_style, cta, product_info, user_id } = body
 
       if (!prospect?.name || !prospect?.company || !prospect?.role) {
         return NextResponse.json({ error: 'Missing required prospect fields: name, company, role' }, { status: 400 })
       }
 
+      // Fetch the user's onboarding profile — single source of truth
+      const profile = user_id ? await fetchOnboardingProfile(user_id) : null
+      const productBlock = buildProductBlock(profile, product_info)
+      const tone = profile?.voice_style || voice_style || 'Professional but warm'
+
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 3000,
-        system: `You are Jamie, an expert AI SDR writing personalized outreach sequences. Generate a 4-step multi-channel outreach sequence for a prospect.
+        system: `You are Jamie, an AI SDR working on behalf of a startup. Your job is to sell THEIR product (described below), NOT Jamie itself and NOT any AI SDR platform. Never mention Jamie, AI SDRs, or automation in the outreach.
 
-Voice style: ${voice_style || 'Professional but warm'}
+Voice style: ${tone}
 Call to action: ${cta || 'Book a demo'}
 
-Product context:
-${product_info ? `- Product: ${product_info.product_name || 'N/A'}
-- Description: ${product_info.product_description || 'N/A'}
-- Problem solved: ${product_info.problem_solved || 'N/A'}
-- Differentiators: ${product_info.key_differentiators || 'N/A'}` : 'No product info provided — use generic AI SDR value props.'}
+${productBlock}
 
 PERSONALIZATION TOKENS — use these EXACTLY as written in ALL messages (emails AND LinkedIn):
 - {{first_name}} for the prospect's first name
@@ -87,7 +138,7 @@ ${prospect.notes ? `- Notes: ${prospect.notes}` : ''}`,
 
     // ACTION: Generate a single message (regenerate one step)
     if (action === 'generate_single') {
-      const { prospect, step, channel, context, voice_style, cta } = body
+      const { prospect, step, channel, context, voice_style, cta, user_id } = body
 
       const isLinkedIn = channel === 'linkedin'
       const stepDescriptions: Record<number, string> = {
@@ -97,14 +148,21 @@ ${prospect.notes ? `- Notes: ${prospect.notes}` : ''}`,
         4: 'Breakup email (Day 10) — last chance, create urgency',
       }
 
+      // Fetch the user's onboarding profile — single source of truth
+      const profile = user_id ? await fetchOnboardingProfile(user_id) : null
+      const productBlock = buildProductBlock(profile)
+      const tone = profile?.voice_style || voice_style || 'Professional but warm'
+
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 800,
-        system: `You are Jamie, an expert AI SDR. Generate a single ${channel} message for step ${step} of an outreach sequence.
+        system: `You are Jamie, an AI SDR working on behalf of a startup. Your job is to sell THEIR product (described below), NOT Jamie itself and NOT any AI SDR platform. Never mention Jamie, AI SDRs, or automation in the outreach.
 
-Voice style: ${voice_style || 'Professional but warm'}
+Voice style: ${tone}
 Call to action: ${cta || 'Book a demo'}
 Step purpose: ${stepDescriptions[step] || 'Outreach message'}
+
+${productBlock}
 
 ${context ? `Additional context: ${context}` : ''}
 
@@ -149,12 +207,20 @@ ${prospect.notes ? `- Notes: ${prospect.notes}` : ''}`,
 
     // ACTION: Analyze a reply for intent detection
     if (action === 'analyze_reply') {
-      const { reply_text, prospect, sequence_context } = body
+      const { reply_text, prospect, sequence_context, user_id } = body
+
+      // Fetch the user's onboarding profile so the draft response pitches the right product
+      const profile = user_id ? await fetchOnboardingProfile(user_id) : null
+      const productBlock = buildProductBlock(profile)
 
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: `You are Jamie, an AI SDR analyzing prospect replies. Determine the intent and sentiment of the reply, and draft an appropriate response.
+        system: `You are Jamie, an AI SDR working on behalf of a startup. You are analyzing prospect replies and drafting responses that sell THEIR product (described below), NOT Jamie itself and NOT any AI SDR platform.
+
+${productBlock}
+
+Determine the intent and sentiment of the reply, and draft an appropriate response.
 
 Intents: interested, not_interested, need_more_info, unsubscribe, out_of_office
 Sentiments: positive, negative, neutral, out_of_office
