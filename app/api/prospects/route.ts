@@ -6,10 +6,16 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
+// Anon client for reads and auth validation
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
+
+// Service role client for inserts/updates (bypasses RLS)
+const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : supabase
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,7 +36,7 @@ export async function POST(request: NextRequest) {
       if (user_id && (!providedIcp || !providedIcp.industries)) {
         try {
           // Try auth user metadata (where onboarding saves data) — requires service role key
-          const { data: { user: authUser } } = await supabase.auth.admin.getUserById(user_id)
+          const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(user_id)
           const od = authUser?.user_metadata?.onboarding_data as Record<string, unknown> | undefined
 
           if (od) {
@@ -123,7 +129,7 @@ Return the JSON array now.`,
           status: 'new',
         }))
 
-        const { data: saved, error } = await supabase
+        const { data: saved, error } = await supabaseAdmin
           .from('prospects')
           .insert(rows)
           .select()
@@ -197,7 +203,7 @@ Return the JSON array now.`,
     if (action === 'update_status') {
       const { prospect_id, status } = body
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('prospects')
         .update({ status })
         .eq('id', prospect_id)
@@ -216,7 +222,7 @@ Return the JSON array now.`,
     if (action === 'add_note') {
       const { prospect_id, note } = body
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('prospect_notes')
         .insert({ prospect_id, note })
         .select()
