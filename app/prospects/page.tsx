@@ -623,9 +623,30 @@ export default function ProspectsPage() {
                   </div>
 
                   {/* Email */}
-                  <p className="mn" style={{ fontSize: '11px', color: '#6B6B6B', margin: '0 0 12px 0' }}>
+                  <p className="mn" style={{ fontSize: '11px', color: '#6B6B6B', margin: '0 0 8px 0' }}>
                     {prospect.email}
                   </p>
+
+                  {/* LinkedIn */}
+                  {prospect.linkedin_url && (
+                    <a
+                      href={prospect.linkedin_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bd"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '5px',
+                        fontSize: '11px', fontWeight: 600, color: '#0077B5',
+                        textDecoration: 'none', marginBottom: '12px',
+                        padding: '3px 8px', borderRadius: '6px',
+                        border: '1px solid rgba(0,119,181,.2)', background: 'rgba(0,119,181,.04)',
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/linkedin-icon.svg" alt="" width={12} height={12} />
+                      View on LinkedIn
+                    </a>
+                  )}
 
                   {/* Score + meta */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>

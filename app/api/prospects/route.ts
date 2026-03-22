@@ -36,9 +36,11 @@ function buildApolloEmployeeRanges(companySizes: string): string[] {
 
 // Map our ICP roles to Apollo person_titles
 function buildApolloTitles(roles: string): string[] {
-  if (!roles) return ['Founder', 'CEO', 'VP of Sales']
+  if (!roles) return ['CEO', 'VP of Sales', 'Head of Growth', 'Founder', 'COO']
   return roles.split(',').map(r => r.trim()).filter(Boolean)
 }
+
+const DECISION_MAKER_SENIORITY = ['director', 'vp', 'c_suite', 'owner', 'founder', 'partner', 'manager']
 
 // Map our ICP geography to Apollo person_locations
 function buildApolloLocations(geography: string): string[] {
@@ -65,6 +67,7 @@ interface ApolloPersonResult {
   title?: string
   email?: string
   linkedin_url?: string
+  linkedin_uid?: string
   city?: string
   state?: string
   organization?: {
@@ -78,6 +81,14 @@ interface ApolloPersonResult {
 async function searchApollo(icp: Record<string, string>): Promise<ApolloPersonResult[]> {
   if (!process.env.APOLLO_API_KEY) return []
 
+  const titles = buildApolloTitles(icp.roles)
+  const seniority = DECISION_MAKER_SENIORITY
+  const industries = icp.industries
+    ? icp.industries.split(',').map((s: string) => s.trim()).filter(Boolean)
+    : undefined
+
+  console.log('Apollo search:', { titles, seniority, industries })
+
   const res = await fetch('https://api.apollo.io/v1/people/search', {
     method: 'POST',
     headers: {
@@ -85,12 +96,11 @@ async function searchApollo(icp: Record<string, string>): Promise<ApolloPersonRe
       'X-Api-Key': process.env.APOLLO_API_KEY!,
     },
     body: JSON.stringify({
-      person_titles: buildApolloTitles(icp.roles),
+      person_titles: titles,
+      person_seniority_tags: seniority,
       person_locations: buildApolloLocations(icp.geography),
       organization_num_employees_ranges: buildApolloEmployeeRanges(icp.company_size),
-      q_organization_keyword_tags: icp.industries
-        ? icp.industries.split(',').map((s: string) => s.trim()).filter(Boolean)
-        : undefined,
+      q_organization_keyword_tags: industries,
       page: 1,
       per_page: 10,
     }),
@@ -163,13 +173,18 @@ export async function POST(request: NextRequest) {
         if (apolloPeople.length > 0) {
           // Map Apollo results to our schema (without score/reasons yet)
           const apolloProspects = apolloPeople
-            .filter(p => p.name || (p.first_name && p.last_name))
+            .filter(p => {
+              if (!p.name && !(p.first_name && p.last_name)) return false
+              // Skip prospects with no LinkedIn presence
+              if (!p.linkedin_url && !p.linkedin_uid) return false
+              return true
+            })
             .map(p => ({
               name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
               title: p.title || 'Unknown Title',
               company: p.organization?.name || 'Unknown Company',
               email: p.email || '',
-              linkedin_url: p.linkedin_url || '',
+              linkedin_url: p.linkedin_url || (p.linkedin_uid ? `https://www.linkedin.com/in/${p.linkedin_uid}` : ''),
               industry: p.organization?.industry || '',
               company_size: toStandardSizeRange(p.organization?.estimated_num_employees),
               location: [p.city, p.state].filter(Boolean).join(', '),
